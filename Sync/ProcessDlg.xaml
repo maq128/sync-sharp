@@ -1,0 +1,13 @@
+﻿<Window x:Class="Sync.ProcessDlg"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="正在处理……"
+    Height="104"
+    Width="300"
+    WindowStartupLocation="CenterOwner"
+    >
+    <Grid>
+        <ProgressBar Height="10" Margin="12,12,12,0" Name="progressBar1" VerticalAlignment="Top" Orientation="Horizontal" Value="0" />
+        <Button Height="23" Margin="104,0,99,12" Name="btn" VerticalAlignment="Bottom" Click="btn_Click">停止</Button>
+    </Grid>
+</Window>
