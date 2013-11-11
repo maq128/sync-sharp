@@ -37,6 +37,7 @@
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
+    <Reference Include="System.Web" />
     <Reference Include="System.Xml.Linq">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
@@ -105,6 +106,20 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="VirtualToggleButton.cs" />
+    <Compile Include="WebDav\Exceptions\UnauthorizedException.cs" />
+    <Compile Include="WebDav\Exceptions\WebDavException.cs" />
+    <Compile Include="WebDav\Exceptions\WebDavHttpException.cs" />
+    <Compile Include="WebDav\IConnectionSettings.cs" />
+    <Compile Include="WebDav\IFolder.cs" />
+    <Compile Include="WebDav\IHierarchyItem.cs" />
+    <Compile Include="WebDav\IItemContent.cs" />
+    <Compile Include="WebDav\IResource.cs" />
+    <Compile Include="WebDav\IResumableUpload.cs" />
+    <Compile Include="WebDav\ItemType.cs" />
+    <Compile Include="WebDav\LockUriTokenPair.cs" />
+    <Compile Include="WebDav\Property.cs" />
+    <Compile Include="WebDav\PropertyName.cs" />
+    <Compile Include="WebDav\WebDavSession.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
