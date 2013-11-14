@@ -86,6 +86,8 @@
       <DependentUpon>FolderTreeView.xaml</DependentUpon>
     </Compile>
     <Compile Include="FooViewModel.cs" />
+    <Compile Include="ISimpleFS.cs" />
+    <Compile Include="LocalFS.cs" />
     <Compile Include="MainWin.xaml.cs">
       <DependentUpon>MainWin.xaml</DependentUpon>
     </Compile>

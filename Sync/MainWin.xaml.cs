@@ -20,6 +20,7 @@ using System.Threading;
 
 using WebDav.Client;
 using System.Net;
+using System.Collections;
 
 namespace Sync
 {
@@ -28,9 +29,6 @@ namespace Sync
     /// </summary>
     public partial class MainWin : Window
     {
-        NameComparer<DirectoryInfo> _dirNameComparer;
-        NameComparer<FileInfo> _fileNameComparer;
-
         public MainWin()
         {
             InitializeComponent();
@@ -39,9 +37,6 @@ namespace Sync
             DirectoryInfo home = cwd.Parent.Parent.Parent;
             textDirA.Text = home.FullName + "\\测试目录A";
             textDirB.Text = home.FullName + "\\测试目录B";
-
-            _dirNameComparer = new NameComparer<DirectoryInfo>();
-            _fileNameComparer = new NameComparer<FileInfo>();
         }
 
         BackgroundWorker _worker;
@@ -50,23 +45,25 @@ namespace Sync
 
         private void btnCompare_Click( object sender, RoutedEventArgs e )
         {
-            WebDavSession session = new WebDavSession();
-            session.Credentials = new NetworkCredential( "admin", "*" );
-            IFolder folder = session.OpenFolder( "http://192.168.1.80/maq/" );
-            IHierarchyItem[] items = folder.GetChildren();
-            foreach ( IHierarchyItem item in items ) {
-                Console.WriteLine( item.DisplayName );
-            }
-            return;
+            //WebDavSession session = new WebDavSession();
+            //session.Credentials = new NetworkCredential( "admin", "*" );
+            //IFolder folder = session.OpenFolder( "http://192.168.1.80/maq/" );
+            //IHierarchyItem[] items = folder.GetChildren();
+            //foreach ( IHierarchyItem item in items ) {
+            //    Console.WriteLine( item.DisplayName );
+            //}
+            //return;
 
-            FooViewModel rootAonly = FooViewModel.CreateRootItem( "仅在A中存在的文件" );
-            FooViewModel rootAnewer = FooViewModel.CreateRootItem( "在A中较新的文件" );
-            FooViewModel rootAB = FooViewModel.CreateRootItem( "在AB中相同的文件" );
-            FooViewModel rootBnewer = FooViewModel.CreateRootItem( "在B中较新的文件" );
-            FooViewModel rootBonly = FooViewModel.CreateRootItem( "仅在B中存在的文件" );
+            LocalFS aFS = new LocalFS( textDirA.Text );
+            LocalFS bFS = new LocalFS( textDirB.Text );
+            FooViewModel rootAonly = FooViewModel.CreateRootItem( "仅在A中存在的文件", aFS );
+            FooViewModel rootAnewer = FooViewModel.CreateRootItem( "在A中较新的文件", null );
+            FooViewModel rootAB = FooViewModel.CreateRootItem( "在AB中相同的文件", null ); // 不会存在 lazy-item，所以不需要 FS 支持
+            FooViewModel rootBnewer = FooViewModel.CreateRootItem( "在B中较新的文件", null );
+            FooViewModel rootBonly = FooViewModel.CreateRootItem( "仅在B中存在的文件", bFS );
 
-            DirectoryInfo dirA = new DirectoryInfo( textDirA.Text );
-            DirectoryInfo dirB = new DirectoryInfo( textDirB.Text );
+            SimpleDirInfo dirA = new SimpleDirInfo( aFS );
+            SimpleDirInfo dirB = new SimpleDirInfo( bFS );
 
             ProcessDlgWorkingHandler fnWorking = delegate( BackgroundWorker worker ) {
                 _worker = worker;
@@ -106,7 +103,7 @@ namespace Sync
             }
         }
 
-        private void compareTree( DirectoryInfo dirA, DirectoryInfo dirB, FooViewModel parentAonly, FooViewModel parentAnewer, FooViewModel parentAB, FooViewModel parentBnewer, FooViewModel parentBonly )
+        private void compareTree( SimpleDirInfo dirA, SimpleDirInfo dirB, FooViewModel parentAonly, FooViewModel parentAnewer, FooViewModel parentAB, FooViewModel parentBnewer, FooViewModel parentBonly )
         {
             if ( _worker.CancellationPending || _cancel ) {
                 _cancel = true;
@@ -115,12 +112,32 @@ namespace Sync
 
             reportProgress();
 
-            DirectoryInfo[] subDirsA = dirA.GetDirectories();
-            DirectoryInfo[] subDirsB = dirB.GetDirectories();
+            // ---- 比对子目录
+
+            SortedList<string, SimpleDirInfo> subDirsA = dirA.getSubdirs();
+            SortedList<string, SimpleDirInfo> subDirsB = dirB.getSubdirs();
+
+            // 分拣出 A、B 共有的那些子目录
+            SortedList<string, SimpleDirInfo[]> subDirsAB = new SortedList<string, SimpleDirInfo[]>();
+            foreach ( KeyValuePair<string, SimpleDirInfo> item in subDirsA ) {
+                string name = item.Key;
+                if ( subDirsB.ContainsKey( name ) ) {
+                    SimpleDirInfo[] abPair = new SimpleDirInfo[2];
+                    abPair[0] = item.Value;
+                    subDirsB.TryGetValue( name, out abPair[1] );
+                    subDirsAB.Add( name, abPair );
+                    subDirsB.Remove( name );
+                }
+            }
+            foreach ( KeyValuePair<string, SimpleDirInfo[]> item in subDirsAB ) {
+                string name = item.Key;
+                subDirsA.Remove( name );
+            }
 
             // 对 A、B 中同时存在的子目录进行遍历
-            foreach ( DirectoryInfo a in subDirsA.Intersect( subDirsB, _dirNameComparer ) ) {
-                DirectoryInfo b = new DirectoryInfo( dirB.FullName + "\\" + a.Name );
+            foreach ( KeyValuePair<string, SimpleDirInfo[]> item in subDirsAB ) {
+                SimpleDirInfo a = item.Value[0];
+                SimpleDirInfo b = item.Value[1];
 
                 FooViewModel subAonly = parentAonly.CreateFolderItem( a.Name );
                 FooViewModel subAnewer = parentAnewer.CreateFolderItem( a.Name );
@@ -147,21 +164,43 @@ namespace Sync
             }
 
             // 对仅在 A 中存在的子目录进行遍历
-            foreach ( DirectoryInfo a in subDirsA.Except( subDirsB, _dirNameComparer ) ) {
+            foreach ( KeyValuePair<string, SimpleDirInfo> item in subDirsA ) {
+                SimpleDirInfo a = item.Value;
                 parentAonly.Children.Add( parentAonly.CreateLazyFolderItem( a.FullName ) );
             }
 
             // 对仅在 B 中存在的子目录进行遍历
-            foreach ( DirectoryInfo b in subDirsB.Except( subDirsA, _dirNameComparer ) ) {
+            foreach ( KeyValuePair<string, SimpleDirInfo> item in subDirsB ) {
+                SimpleDirInfo b = item.Value;
                 parentBonly.Children.Add( parentBonly.CreateLazyFolderItem( b.FullName ) );
             }
 
-            FileInfo[] subFilesA = dirA.GetFiles();
-            FileInfo[] subFilesB = dirB.GetFiles();
+            // ---- 比对文件
+
+            SortedList<string, SimpleFileInfo> subFilesA = dirA.getFiles();
+            SortedList<string, SimpleFileInfo> subFilesB = dirB.getFiles();
+
+            // 分拣出 A、B 共有的那些文件
+            SortedList<string, SimpleFileInfo[]> subFilesAB = new SortedList<string, SimpleFileInfo[]>();
+            foreach ( KeyValuePair<string, SimpleFileInfo> item in subFilesA ) {
+                string name = item.Key;
+                if ( subFilesB.ContainsKey( name ) ) {
+                    SimpleFileInfo[] abPair = new SimpleFileInfo[2];
+                    abPair[0] = item.Value;
+                    subFilesB.TryGetValue( name, out abPair[1] );
+                    subFilesAB.Add( name, abPair );
+                    subFilesB.Remove( name );
+                }
+            }
+            foreach ( KeyValuePair<string, SimpleFileInfo[]> item in subFilesAB ) {
+                string name = item.Key;
+                subFilesA.Remove( name );
+            }
 
             // 对 A、B 中同时存在的文件进行遍历
-            foreach ( FileInfo a in subFilesA.Intersect( subFilesB, _fileNameComparer ) ) {
-                FileInfo b = new FileInfo( dirB.FullName + "\\" + a.Name );
+            foreach ( KeyValuePair<string, SimpleFileInfo[]> item in subFilesAB ) {
+                SimpleFileInfo a = item.Value[0];
+                SimpleFileInfo b = item.Value[1];
 
                 if ( a.LastWriteTime > b.LastWriteTime.AddSeconds( 5 ) ) {
                     // A > B
@@ -176,29 +215,16 @@ namespace Sync
             }
 
             // 对仅在 A 中存在的文件进行遍历
-            foreach ( FileInfo a in subFilesA.Except( subFilesB, _fileNameComparer ) ) {
+            foreach ( KeyValuePair<string, SimpleFileInfo> item in subFilesA ) {
+                SimpleFileInfo a = item.Value;
                 parentAonly.Children.Add( parentAonly.CreateFileItem( a.Name ) );
             }
 
             // 对仅在 B 中存在的文件进行遍历
-            foreach ( FileInfo b in subFilesB.Except( subFilesA, _fileNameComparer ) ) {
+            foreach ( KeyValuePair<string, SimpleFileInfo> item in subFilesB ) {
+                SimpleFileInfo b = item.Value;
                 parentBonly.Children.Add( parentBonly.CreateFileItem( b.Name ) );
             }
-        }
-    }
-
-    public class NameComparer<T> : IEqualityComparer<T> where T : FileSystemInfo
-    {
-        public NameComparer() { }
-
-        public bool Equals( T x, T y )
-        {
-            return x.Name.ToLower() == y.Name.ToLower();
-        }
-
-        public int GetHashCode( T obj )
-        {
-            return obj.Name.ToLower().GetHashCode();
         }
     }
 }

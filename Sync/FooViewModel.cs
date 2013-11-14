@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using Sync;
 
 namespace TreeViewWithCheckBoxes
 {
@@ -29,10 +30,12 @@ namespace TreeViewWithCheckBoxes
 
         #endregion // Data
 
+        ISimpleFS _rootFS;
+
         // 创建根项
-        public static FooViewModel CreateRootItem( string name )
+        public static FooViewModel CreateRootItem( string name, ISimpleFS rootFS )
         {
-            FooViewModel item = new FooViewModel( name ) {
+            FooViewModel item = new FooViewModel( name, rootFS ) {
                 _itemType = ItemType.ITEM_TYPE_VIRTUALROOT,
                 Icon = ICON_VIRTUALROOT,
             };
@@ -42,7 +45,7 @@ namespace TreeViewWithCheckBoxes
         // 创建一个目录子项（用懒加载）
         public FooViewModel CreateLazyFolderItem( string fullpath )
         {
-            FooViewModel subItem = new FooViewModel( Path.GetFileName( fullpath ) ) {
+            FooViewModel subItem = new FooViewModel( Path.GetFileName( fullpath ), this._rootFS ) {
                 _parent = this,
                 _itemType = ItemType.ITEM_TYPE_FOLDER,
                 Icon = ICON_FOLDER_CLOSE,
@@ -52,7 +55,7 @@ namespace TreeViewWithCheckBoxes
             }
 
             subItem._fullpath = fullpath;
-            subItem.Children.Add( new FooViewModel( "" ) {
+            subItem.Children.Add( new FooViewModel( "", this._rootFS ) {
                 _itemType = ItemType.ITEM_TYPE_PLACEHOLDER,
                 Icon = ICON_PLACEHOLDER,
                 CbVisibility = "Collapsed",
@@ -63,7 +66,7 @@ namespace TreeViewWithCheckBoxes
         // 创建一个目录子项（不用懒加载）
         public FooViewModel CreateFolderItem( string name )
         {
-            FooViewModel subItem = new FooViewModel( name ) {
+            FooViewModel subItem = new FooViewModel( name, this._rootFS ) {
                 _parent = this,
                 _itemType = ItemType.ITEM_TYPE_FOLDER,
                 Icon = ICON_FOLDER_CLOSE,
@@ -77,7 +80,7 @@ namespace TreeViewWithCheckBoxes
         // 创建一个文件子项
         public FooViewModel CreateFileItem( string name )
         {
-            FooViewModel subItem = new FooViewModel( name ) {
+            FooViewModel subItem = new FooViewModel( name, this._rootFS ) {
                 _parent = this,
                 _itemType = ItemType.ITEM_TYPE_FILE,
                 Icon = ICON_FILE,
@@ -88,12 +91,13 @@ namespace TreeViewWithCheckBoxes
             return subItem;
         }
 
-        public FooViewModel( string name )
+        public FooViewModel( string name, ISimpleFS rootFS )
         {
             this._fullpath = "";
             this.Name = name;
             this.Children = new List<FooViewModel>();
             this.CbVisibility = "Visible";
+            this._rootFS = rootFS;
         }
 
         #region Properties
@@ -120,19 +124,19 @@ namespace TreeViewWithCheckBoxes
 
                 if ( _isExpanded ) {
                     if ( _fullpath.Length > 0 ) {
-                        DirectoryInfo dires = new DirectoryInfo( _fullpath );
-                        _fullpath = "";
+                        SortedList<string, SimpleDirInfo> dirs = this._rootFS.getSubdirs( _fullpath );
                         Children.Clear();
 
-                        DirectoryInfo[] dir = dires.GetDirectories();
-                        foreach ( DirectoryInfo d in dir ) {
-                            Children.Add( CreateLazyFolderItem( d.FullName ) );
+                        foreach ( KeyValuePair<string, SimpleDirInfo> item in dirs ) {
+                            Children.Add( CreateLazyFolderItem( item.Value.FullName ) );
                         }
 
-                        FileInfo[] files = dires.GetFiles();
-                        foreach ( FileInfo f in files ) {
-                            Children.Add( CreateFileItem( f.Name ) );
+                        SortedList<string, SimpleFileInfo> files = this._rootFS.getFiles( _fullpath );
+                        foreach ( KeyValuePair<string, SimpleFileInfo> item in files ) {
+                            Children.Add( CreateFileItem( item.Value.Name ) );
                         }
+
+                        _fullpath = "";
                     }
 
                     if ( _itemType == ItemType.ITEM_TYPE_FOLDER ) {
