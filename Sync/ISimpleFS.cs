@@ -54,7 +54,8 @@ namespace Sync
      * 每个实现类应该有一个 root 的概念。
      * 接口中涉及到的 path 都是相对于 root 而言的。
      * path 中的 \ 视同于 /。
-     * path 的开头如果没有 / 则视同于有一个 /。
+     * path 为空表示“根”。
+     * path 非空时，开头应该有 /，结尾不应该有 /。
      */
     public interface ISimpleFS
     {

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -18,8 +17,6 @@ using System.Diagnostics;
 using System.ComponentModel;
 using System.Threading;
 
-using WebDav.Client;
-using System.Net;
 using System.Collections;
 
 namespace Sync
@@ -45,17 +42,9 @@ namespace Sync
 
         private void btnCompare_Click( object sender, RoutedEventArgs e )
         {
-            //WebDavSession session = new WebDavSession();
-            //session.Credentials = new NetworkCredential( "admin", "*" );
-            //IFolder folder = session.OpenFolder( "http://192.168.1.80/maq/" );
-            //IHierarchyItem[] items = folder.GetChildren();
-            //foreach ( IHierarchyItem item in items ) {
-            //    Console.WriteLine( item.DisplayName );
-            //}
-            //return;
-
             LocalFS aFS = new LocalFS( textDirA.Text );
             LocalFS bFS = new LocalFS( textDirB.Text );
+
             FooViewModel rootAonly = FooViewModel.CreateRootItem( "仅在A中存在的文件", aFS );
             FooViewModel rootAnewer = FooViewModel.CreateRootItem( "在A中较新的文件", null );
             FooViewModel rootAB = FooViewModel.CreateRootItem( "在AB中相同的文件", null ); // 不会存在 lazy-item，所以不需要 FS 支持

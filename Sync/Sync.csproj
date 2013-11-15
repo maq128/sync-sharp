@@ -108,6 +108,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="VirtualToggleButton.cs" />
+    <Compile Include="WebdavFS.cs" />
     <Compile Include="WebDav\Exceptions\UnauthorizedException.cs" />
     <Compile Include="WebDav\Exceptions\WebDavException.cs" />
     <Compile Include="WebDav\Exceptions\WebDavHttpException.cs" />
