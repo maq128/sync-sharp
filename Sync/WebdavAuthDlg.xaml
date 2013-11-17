@@ -1,0 +1,17 @@
+﻿<Window x:Class="Sync.WebdavAuthDlg"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    WindowStartupLocation="CenterOwner"
+    Title="验证访问权限" Height="217" Width="349">
+    <Grid>
+        <Label Height="23" Name="label1" VerticalAlignment="Top" HorizontalAlignment="Left" Width="48" Margin="12,12,0,0">访问点</Label>
+        <Label Height="23" Margin="12,43,0,0" Name="label2" VerticalAlignment="Top" HorizontalAlignment="Left" Width="48">用户名</Label>
+        <Label Margin="12,75,0,0" Name="label3" HorizontalAlignment="Left" Width="48" Height="23" VerticalAlignment="Top">密　码</Label>
+        <Label Height="23" Margin="66,12,12,0" Name="labelUrl" VerticalAlignment="Top" Padding="0,5,5,5">http://...</Label>
+        <TextBox Margin="66,43,12,0" Name="textUsername" Height="23" VerticalAlignment="Top" />
+        <PasswordBox Margin="66,75,12,0" Name="textPassword" Height="23" VerticalAlignment="Top" />
+        <CheckBox Height="16" Margin="66,104,0,0" Name="cbSavePassword" VerticalAlignment="Top" HorizontalAlignment="Left" Width="75">保存密码</CheckBox>
+        <Button Height="23" Margin="66,0,0,19" Name="btnOk" VerticalAlignment="Bottom" IsDefault="True" HorizontalAlignment="Left" Width="75" Click="btnOk_Click">确定</Button>
+        <Button Height="23" Margin="162,0,0,19" Name="btnCancel" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="75" Click="btnCancel_Click">取消</Button>
+    </Grid>
+</Window>

@@ -8,25 +8,21 @@ namespace Sync
 {
     public class WebdavFS : ISimpleFS
     {
-        public delegate bool RequireAuthHandler( string name, out string username, out string password );
-
         private string _root;
-        RequireAuthHandler _callback;
-        private string _username;
-        private string _password;
         WebDavSession _session;
 
-        public WebdavFS( string root, RequireAuthHandler callback )
+        public WebdavFS( string root )
         {
             this._root = root;
             if ( ! this._root.EndsWith( "/" ) ) {
                 this._root += "/";
             }
-            this._callback = callback;
-            this._username = "";
-            this._password = "";
-
             this._session = new WebDavSession();
+        }
+
+        public void setAuth( string username, string password )
+        {
+            this._session.Credentials = new NetworkCredential( username, password );
         }
 
         public SortedList<string, SimpleInfoBase> getChildren( string path )
@@ -43,20 +39,7 @@ namespace Sync
 
             SortedList<string, SimpleInfoBase> result = new SortedList<string, SimpleInfoBase>();
 
-            IFolder folder = null;
-            while ( true ) {
-                try {
-                    folder = this._session.OpenFolder( url );
-                    break;
-                } catch ( UnauthorizedException ) {
-                    if ( this._callback( url, out this._username, out this._password ) ) {
-                        this._session.Credentials = new NetworkCredential( this._username, this._password );
-                    } else {
-                        throw new System.Exception( "没有权限访问 " + url );
-                    }
-                }
-            }
-
+            IFolder folder = this._session.OpenFolder( url );
             IHierarchyItem[] items = folder.GetChildren();
             foreach ( IHierarchyItem item in items ) {
 

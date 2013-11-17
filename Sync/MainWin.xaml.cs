@@ -30,27 +30,61 @@ namespace Sync
         {
             InitializeComponent();
 
-            DirectoryInfo cwd = new DirectoryInfo( Directory.GetCurrentDirectory() );
-            DirectoryInfo home = cwd.Parent.Parent.Parent;
-            textDirA.Text = home.FullName + "\\测试目录A";
-            textDirB.Text = home.FullName + "\\测试目录B";
+            _config = Config.load();
+//             _config.addComparePoint( "debug", textDirA.Text, textDirB.Text );
+//             _config.save();
+
+            ComparePoint cp = _config.cps.First().Value;
+            if ( cp == null ) {
+                DirectoryInfo cwd = new DirectoryInfo( Directory.GetCurrentDirectory() );
+                DirectoryInfo home = cwd.Parent.Parent.Parent;
+                textDirA.Text = home.FullName + "\\测试目录A";
+                textDirB.Text = home.FullName + "\\测试目录B";
+            }
+
+            textDirA.Text = cp.a;
+            textDirB.Text = cp.b;
         }
 
+        Config _config;
         BackgroundWorker _worker;
         bool _cancel;
         int _progress;
 
+        private ISimpleFS createFS( string name )
+        {
+            if ( name.StartsWith( "http://" ) || name.StartsWith( "https://" ) ) {
+                WebdavFS fs = new WebdavFS( name );
+                while ( true ) {
+                    try {
+                        // 验证是否具有访问权限
+                        fs.getChildren( "" );
+                        break;
+                    } catch ( WebDav.Client.Exceptions.UnauthorizedException ) {
+                        WebdavAuthDlg dlgAuth = new WebdavAuthDlg();
+                        dlgAuth.Owner = this;
+                        dlgAuth.labelUrl.Content = name;
+                        dlgAuth.cbSavePassword.IsChecked = true;
+                        bool? ok = dlgAuth.ShowDialog();
+                        if ( ok.HasValue && (bool)ok ) {
+                            fs.setAuth( dlgAuth.textUsername.Text, dlgAuth.textPassword.Password );
+                        } else {
+                            return null;
+                        }
+                    }
+                }
+                return fs;
+            }
+            return new LocalFS( name );
+        }
+
         private void btnCompare_Click( object sender, RoutedEventArgs e )
         {
-            LocalFS aFS = new LocalFS( textDirA.Text );
-            LocalFS bFS = new LocalFS( textDirB.Text );
+            ISimpleFS aFS = createFS( textDirA.Text );
+            ISimpleFS bFS = createFS( textDirB.Text );
 
-//             WebdavFS.RequireAuthHandler authHandler = delegate( string name, out string username, out string password ) {
-//                 username = "admin";
-//                 password = "*";
-//                 return false;
-//             };
-//             WebdavFS bFS = new WebdavFS( "http://192.168.1.80/maq/", authHandler );
+            if ( aFS == null || bFS == null )
+                return;
 
             FooViewModel rootAonly = FooViewModel.CreateRootItem( "仅在A中存在的文件", aFS );
             FooViewModel rootAnewer = FooViewModel.CreateRootItem( "在A中较新的文件", null );   //
