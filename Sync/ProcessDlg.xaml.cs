@@ -60,12 +60,13 @@ namespace Sync
                 this.Close();
 
                 if ( e.Error != null ) {
-                    Debug.WriteLine( "BackgroundWorker: " + e.Error.ToString() );
+                    //Debug.WriteLine( "BackgroundWorker: " + e.Error.ToString() );
+                    MessageBox.Show( e.Error.Message, "失败" );
                     return;
                 }
 
                 if ( e.Cancelled ) {
-                    Debug.WriteLine( "BackgroundWorker: canceled." );
+                    //Debug.WriteLine( "BackgroundWorker: canceled." );
                     return;
                 }
 

@@ -45,10 +45,17 @@ namespace Sync
             LocalFS aFS = new LocalFS( textDirA.Text );
             LocalFS bFS = new LocalFS( textDirB.Text );
 
+//             WebdavFS.RequireAuthHandler authHandler = delegate( string name, out string username, out string password ) {
+//                 username = "admin";
+//                 password = "*";
+//                 return false;
+//             };
+//             WebdavFS bFS = new WebdavFS( "http://192.168.1.80/maq/", authHandler );
+
             FooViewModel rootAonly = FooViewModel.CreateRootItem( "仅在A中存在的文件", aFS );
-            FooViewModel rootAnewer = FooViewModel.CreateRootItem( "在A中较新的文件", null );
-            FooViewModel rootAB = FooViewModel.CreateRootItem( "在AB中相同的文件", null ); // 不会存在 lazy-item，所以不需要 FS 支持
-            FooViewModel rootBnewer = FooViewModel.CreateRootItem( "在B中较新的文件", null );
+            FooViewModel rootAnewer = FooViewModel.CreateRootItem( "在A中较新的文件", null );   //
+            FooViewModel rootAB = FooViewModel.CreateRootItem( "在AB中相同的文件", null );      // 不会存在 lazy-item，所以不需要 FS 支持
+            FooViewModel rootBnewer = FooViewModel.CreateRootItem( "在B中较新的文件", null );   //
             FooViewModel rootBonly = FooViewModel.CreateRootItem( "仅在B中存在的文件", bFS );
 
             SimpleDirInfo dirA = new SimpleDirInfo( aFS );
@@ -84,14 +91,6 @@ namespace Sync
             dlg.ShowDialog();
         }
 
-        private void reportProgress()
-        {
-            _worker.ReportProgress( _progress++ );
-            if ( _progress > 100 ) {
-                _progress = 0;
-            }
-        }
-
         private void compareTree( SimpleDirInfo dirA, SimpleDirInfo dirB, FooViewModel parentAonly, FooViewModel parentAnewer, FooViewModel parentAB, FooViewModel parentBnewer, FooViewModel parentBonly )
         {
             if ( _worker.CancellationPending || _cancel ) {
@@ -99,12 +98,43 @@ namespace Sync
                 return;
             }
 
-            reportProgress();
+            _worker.ReportProgress( _progress++ );
+            if ( _progress > 100 ) {
+                _progress = 0;
+            }
+
+            // 读取 A、B 的所有子项
+            SortedList<string, SimpleInfoBase> aChildren = dirA.getChildren();
+            SortedList<string, SimpleInfoBase> bChildren = dirB.getChildren();
+
+            // 分离出子目录和文件
+            SortedList<string, SimpleDirInfo> subDirsA = new SortedList<string, SimpleDirInfo>();
+            SortedList<string, SimpleDirInfo> subDirsB = new SortedList<string, SimpleDirInfo>();
+
+            SortedList<string, SimpleFileInfo> subFilesA = new SortedList<string, SimpleFileInfo>();
+            SortedList<string, SimpleFileInfo> subFilesB = new SortedList<string, SimpleFileInfo>();
+
+            foreach ( KeyValuePair<string, SimpleInfoBase> item in aChildren ) {
+                string name = item.Key;
+                SimpleInfoBase value = item.Value;
+                if ( value.GetType() == typeof( SimpleDirInfo ) ) {
+                    subDirsA.Add( name, (SimpleDirInfo)value );
+                } else {
+                    subFilesA.Add( name, (SimpleFileInfo)value );
+                }
+            }
+
+            foreach ( KeyValuePair<string, SimpleInfoBase> item in bChildren ) {
+                string name = item.Key;
+                SimpleInfoBase value = item.Value;
+                if ( value.GetType() == typeof( SimpleDirInfo ) ) {
+                    subDirsB.Add( name, (SimpleDirInfo)value );
+                } else {
+                    subFilesB.Add( name, (SimpleFileInfo)value );
+                }
+            }
 
             // ---- 比对子目录
-
-            SortedList<string, SimpleDirInfo> subDirsA = dirA.getSubdirs();
-            SortedList<string, SimpleDirInfo> subDirsB = dirB.getSubdirs();
 
             // 分拣出 A、B 共有的那些子目录
             SortedList<string, SimpleDirInfo[]> subDirsAB = new SortedList<string, SimpleDirInfo[]>();
@@ -155,19 +185,16 @@ namespace Sync
             // 对仅在 A 中存在的子目录进行遍历
             foreach ( KeyValuePair<string, SimpleDirInfo> item in subDirsA ) {
                 SimpleDirInfo a = item.Value;
-                parentAonly.Children.Add( parentAonly.CreateLazyFolderItem( a.FullName ) );
+                parentAonly.Children.Add( parentAonly.CreateLazyFolderItem( a.Name, a.FullName ) );
             }
 
             // 对仅在 B 中存在的子目录进行遍历
             foreach ( KeyValuePair<string, SimpleDirInfo> item in subDirsB ) {
                 SimpleDirInfo b = item.Value;
-                parentBonly.Children.Add( parentBonly.CreateLazyFolderItem( b.FullName ) );
+                parentBonly.Children.Add( parentBonly.CreateLazyFolderItem( b.Name, b.FullName ) );
             }
 
             // ---- 比对文件
-
-            SortedList<string, SimpleFileInfo> subFilesA = dirA.getFiles();
-            SortedList<string, SimpleFileInfo> subFilesB = dirB.getFiles();
 
             // 分拣出 A、B 共有的那些文件
             SortedList<string, SimpleFileInfo[]> subFilesAB = new SortedList<string, SimpleFileInfo[]>();

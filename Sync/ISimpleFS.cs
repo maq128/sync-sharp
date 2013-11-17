@@ -24,24 +24,40 @@ namespace Sync
             this.FullName = "";
         }
 
+        public SortedList<string, SimpleInfoBase> getChildren()
+        {
+            return this.rootFS.getChildren( this.FullName );
+        }
+
+        // 基于 getChildren() 实现的便捷方法
         public SortedList<string, SimpleDirInfo> getSubdirs()
         {
-            return this.rootFS.getSubdirs( this.FullName );
+            SortedList<string, SimpleDirInfo> result = new SortedList<string, SimpleDirInfo>();
+            SortedList<string, SimpleInfoBase> children = getChildren();
+            foreach ( KeyValuePair<string, SimpleInfoBase> item in children ) {
+                string name = item.Key;
+                SimpleInfoBase value = item.Value;
+                if ( value.GetType() == typeof( SimpleDirInfo ) ) {
+                    result.Add( name, (SimpleDirInfo)value );
+                }
+            }
+            return result;
         }
 
+        // 基于 getChildren() 实现的便捷方法
         public SortedList<string, SimpleFileInfo> getFiles()
         {
-            return this.rootFS.getFiles( this.FullName );
+            SortedList<string, SimpleFileInfo> result = new SortedList<string, SimpleFileInfo>();
+            SortedList<string, SimpleInfoBase> children = getChildren();
+            foreach ( KeyValuePair<string, SimpleInfoBase> item in children ) {
+                string name = item.Key;
+                SimpleInfoBase value = item.Value;
+                if ( value.GetType() == typeof( SimpleFileInfo ) ) {
+                    result.Add( name, (SimpleFileInfo)value );
+                }
+            }
+            return result;
         }
-
-        public SimpleDirInfo getSubdir( string name )
-        {
-            SimpleDirInfo subdir = new SimpleDirInfo( this.rootFS );
-            subdir.Name = name;
-            subdir.FullName = this.FullName + '/' + name;
-            return subdir;
-        }
-
     }
 
     public class SimpleFileInfo : SimpleInfoBase
@@ -60,14 +76,9 @@ namespace Sync
     public interface ISimpleFS
     {
         /// <summary>
-        /// 获取 path 路径下的子目录。
+        /// 获取 path 路径下的所有子目录和文件。
+        /// 根据返回结果集中对象的类型（SimpleDirInfo/SimpleFileInfo）可以区分子目录还是文件。
         /// </summary>
-        SortedList<string, SimpleDirInfo> getSubdirs( string path );
-
-        /// <summary>
-        /// 获取 path 路径下的文件。
-        /// </summary>
-        SortedList<string, SimpleFileInfo> getFiles( string path );
-	}
-
+        SortedList<string, SimpleInfoBase> getChildren( string path );
+    }
 }

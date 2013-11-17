@@ -43,9 +43,9 @@ namespace TreeViewWithCheckBoxes
         }
 
         // 创建一个目录子项（用懒加载）
-        public FooViewModel CreateLazyFolderItem( string fullpath )
+        public FooViewModel CreateLazyFolderItem( string name, string fullpath )
         {
-            FooViewModel subItem = new FooViewModel( Path.GetFileName( fullpath ), this._rootFS ) {
+            FooViewModel subItem = new FooViewModel( name, this._rootFS ) {
                 _parent = this,
                 _itemType = ItemType.ITEM_TYPE_FOLDER,
                 Icon = ICON_FOLDER_CLOSE,
@@ -124,16 +124,19 @@ namespace TreeViewWithCheckBoxes
 
                 if ( _isExpanded ) {
                     if ( _fullpath.Length > 0 ) {
-                        SortedList<string, SimpleDirInfo> dirs = this._rootFS.getSubdirs( _fullpath );
+                        SortedList<string, SimpleInfoBase> children = this._rootFS.getChildren( _fullpath );
                         Children.Clear();
 
-                        foreach ( KeyValuePair<string, SimpleDirInfo> item in dirs ) {
-                            Children.Add( CreateLazyFolderItem( item.Value.FullName ) );
+                        foreach ( KeyValuePair<string, SimpleInfoBase> item in children ) {
+                            if ( item.Value.GetType() == typeof( SimpleDirInfo ) ) {
+                                Children.Add( CreateLazyFolderItem( item.Value.Name, item.Value.FullName ) );
+                            }
                         }
 
-                        SortedList<string, SimpleFileInfo> files = this._rootFS.getFiles( _fullpath );
-                        foreach ( KeyValuePair<string, SimpleFileInfo> item in files ) {
-                            Children.Add( CreateFileItem( item.Value.Name ) );
+                        foreach ( KeyValuePair<string, SimpleInfoBase> item in children ) {
+                            if ( item.Value.GetType() == typeof( SimpleFileInfo ) ) {
+                                Children.Add( CreateFileItem( item.Value.Name ) );
+                            }
                         }
 
                         _fullpath = "";
