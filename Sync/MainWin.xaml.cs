@@ -31,19 +31,23 @@ namespace Sync
             InitializeComponent();
 
             _config = Config.load();
-//             _config.addComparePoint( "debug", textDirA.Text, textDirB.Text );
-//             _config.save();
 
-            ComparePoint cp = _config.cps.First().Value;
-            if ( cp == null ) {
+            // 仅用于调试目的
+            if ( _config.cps.Count() == 0 ) {
                 DirectoryInfo cwd = new DirectoryInfo( Directory.GetCurrentDirectory() );
                 DirectoryInfo home = cwd.Parent.Parent.Parent;
                 textDirA.Text = home.FullName + "\\测试目录A";
                 textDirB.Text = home.FullName + "\\测试目录B";
+
+                _config.setComparePoint( "debug", textDirA.Text, textDirB.Text );
+                _config.save();
             }
 
-            textDirA.Text = cp.a;
-            textDirB.Text = cp.b;
+            if ( _config.cps.Count() > 0 ) {
+                ComparePoint cp = _config.cps.First().Value;
+                textDirA.Text = cp.a;
+                textDirB.Text = cp.b;
+            }
         }
 
         Config _config;
@@ -61,13 +65,34 @@ namespace Sync
                         fs.getChildren( "" );
                         break;
                     } catch ( WebDav.Client.Exceptions.UnauthorizedException ) {
+                        // 从配置文件中取出身份信息
+                        string username = "";
+                        string password = "";
+                        bool bSaved = this._config.getAuthInfo( name, out username, out password );
+
                         WebdavAuthDlg dlgAuth = new WebdavAuthDlg();
                         dlgAuth.Owner = this;
                         dlgAuth.labelUrl.Content = name;
-                        dlgAuth.cbSavePassword.IsChecked = true;
+                        dlgAuth.textUsername.Text = username;
+                        dlgAuth.textPassword.Password = password;
+                        dlgAuth.cbSavePassword.IsChecked = bSaved;
                         bool? ok = dlgAuth.ShowDialog();
                         if ( ok.HasValue && (bool)ok ) {
                             fs.setAuth( dlgAuth.textUsername.Text, dlgAuth.textPassword.Password );
+
+                            if ( dlgAuth.cbSavePassword.IsChecked.HasValue && (bool)dlgAuth.cbSavePassword.IsChecked ) {
+                                if ( dlgAuth.textUsername.Text != username || dlgAuth.textPassword.Password != password ) {
+                                    // 如果选择了“保存密码”，而且身份信息有修改，则保存入配置文件
+                                    this._config.setAuthInfo( name, dlgAuth.textUsername.Text, dlgAuth.textPassword.Password );
+                                    this._config.save();
+                                }
+                            } else {
+                                if ( bSaved ) {
+                                    // 如果未选择“保存密码”，而配置文件中已经保存了身份信息，则删除掉
+                                    this._config.removeAuthInfo( name );
+                                    this._config.save();
+                                }
+                            }
                         } else {
                             return null;
                         }
