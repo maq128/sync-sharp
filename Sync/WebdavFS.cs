@@ -83,5 +83,10 @@ namespace Sync
             }
             return result;
         }
+
+        override public string ToString()
+        {
+            return this._root;
+        }
     }
 }

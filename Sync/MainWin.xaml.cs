@@ -55,6 +55,9 @@ namespace Sync
         bool _cancel;
         int _progress;
 
+        ISimpleFS aFS;
+        ISimpleFS bFS;
+
         private ISimpleFS createFS( string name )
         {
             if ( name.StartsWith( "http://" ) || name.StartsWith( "https://" ) ) {
@@ -105,8 +108,10 @@ namespace Sync
 
         private void btnCompare_Click( object sender, RoutedEventArgs e )
         {
-            ISimpleFS aFS = createFS( textDirA.Text );
-            ISimpleFS bFS = createFS( textDirB.Text );
+            // TODO: 所有按钮状态复位
+
+            aFS = createFS( textDirA.Text );
+            bFS = createFS( textDirB.Text );
 
             if ( aFS == null || bFS == null )
                 return;
@@ -136,7 +141,7 @@ namespace Sync
                 rootBnewer.IsExpanded = true;
                 rootBonly.IsExpanded = true;
 
-                treeAony.DataContext = new List<FooViewModel> { rootAonly };
+                treeAonly.DataContext = new List<FooViewModel> { rootAonly };
                 treeAnewer.DataContext = new List<FooViewModel> { rootAnewer };
                 treeAB.DataContext = new List<FooViewModel> { rootAB };
                 treeBnewer.DataContext = new List<FooViewModel> { rootBnewer };
@@ -148,6 +153,26 @@ namespace Sync
             ProcessDlg dlg = new ProcessDlg( fnWorking, fnFinish );
             dlg.Owner = this;
             dlg.ShowDialog();
+
+            // 根据节点的选择情况设置操作按钮的使能状态
+            connectModelToButtons( rootAonly, new Button[] { btnCopy_a, btnDelete_a } );
+            connectModelToButtons( rootAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
+            connectModelToButtons( rootAB, new Button[] { btnDelete_ab } );
+            connectModelToButtons( rootBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
+            connectModelToButtons( rootBonly, new Button[] { btnCopy_b, btnDelete_b } );
+        }
+
+        private void connectModelToButtons( FooViewModel model, Button[] buttons )
+        {
+            PropertyChangedEventHandler h = delegate( object m, PropertyChangedEventArgs ev ) {
+                if ( ev.PropertyName != "IsChecked" )
+                    return;
+                bool en = !model.IsChecked.HasValue || (bool)model.IsChecked;
+                foreach ( Button btn in buttons ) {
+                    btn.IsEnabled = en;
+                }
+            };
+            model.PropertyChanged += h;
         }
 
         private void compareTree( SimpleDirInfo dirA, SimpleDirInfo dirB, FooViewModel parentAonly, FooViewModel parentAnewer, FooViewModel parentAB, FooViewModel parentBnewer, FooViewModel parentBonly )
@@ -300,6 +325,107 @@ namespace Sync
                 SimpleFileInfo b = item.Value;
                 parentBonly.Children.Add( parentBonly.CreateFileItem( b.Name ) );
             }
+        }
+
+        // 遍历一个 model 以收集其全部选中的项目（子目录、文件）
+        private void walkModelTree( FooViewModel model, List<string> colls, string path )
+        {
+            if ( model.IsChecked.HasValue && !(bool)model.IsChecked )
+                return;
+            if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FOLDER ) {
+                if ( model.Fullpath.Length > 0 ) {
+                    // 尚未展开的子目录（以 / 结尾代表其下游全部内容）
+                    colls.Add( path + model.Name + "/" );
+                } else {
+                    // 已经展开的子目录
+                    foreach ( FooViewModel sub in model.Children ) {
+                        walkModelTree( sub, colls, path + model.Name + "/" );
+                    }
+                }
+            } else if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FILE ) {
+                // 文件
+                colls.Add( path + model.Name );
+            }
+        }
+
+        private void doCopy( FooViewModel model, ISimpleFS from, ISimpleFS to )
+        {
+            List<string> colls = new List<string>();
+            foreach ( FooViewModel sub in model.Children ) {
+                walkModelTree( sub, colls, "/" );
+            }
+            System.Console.WriteLine( "copy from: " + from.ToString() );
+            System.Console.WriteLine( "copy to  : " + to.ToString() );
+            foreach ( string path in colls ) {
+                System.Console.WriteLine( "    " + path );
+            }
+        }
+
+        private void doDelete( FooViewModel model, ISimpleFS from )
+        {
+            List<string> colls = new List<string>();
+            foreach ( FooViewModel sub in model.Children ) {
+                walkModelTree( sub, colls, "/" );
+            }
+            System.Console.WriteLine( "delete from: " + from.ToString() );
+            foreach ( string path in colls ) {
+                System.Console.WriteLine( "    " + path );
+            }
+        }
+
+        private void btnCopy_a_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeAonly.DataContext ).First<FooViewModel>();
+            doCopy( model, aFS, bFS );
+        }
+
+        private void btnDelete_a_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeAonly.DataContext ).First<FooViewModel>();
+            doDelete( model, aFS );
+        }
+
+        private void btnCopy_an_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeAnewer.DataContext ).First<FooViewModel>();
+            doCopy( model, aFS, bFS );
+        }
+
+        private void btnRCopy_an_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeAnewer.DataContext ).First<FooViewModel>();
+            doCopy( model, bFS, aFS );
+        }
+
+        private void btnDelete_ab_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeAB.DataContext ).First<FooViewModel>();
+            doDelete( model, aFS );
+            doDelete( model, bFS );
+        }
+
+        private void btnCopy_bn_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeBnewer.DataContext ).First<FooViewModel>();
+            doCopy( model, bFS, aFS );
+        }
+
+        private void btnRCopy_bn_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeBnewer.DataContext ).First<FooViewModel>();
+            doCopy( model, aFS, bFS );
+        }
+
+        private void btnCopy_b_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeBonly.DataContext ).First<FooViewModel>();
+            doCopy( model, bFS, aFS );
+        }
+
+        private void btnDelete_b_Click( object sender, RoutedEventArgs e )
+        {
+            FooViewModel model = ( (List<FooViewModel>)treeBonly.DataContext ).First<FooViewModel>();
+            doDelete( model, bFS );
         }
     }
 }

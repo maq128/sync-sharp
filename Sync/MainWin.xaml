@@ -4,7 +4,7 @@
     xmlns:local="clr-namespace:TreeViewWithCheckBoxes"
     xmlns:dw="clr-namespace:DrWPF.Windows.Controls"
     xmlns:sync="clr-namespace:Sync"
-    Title="MainWin"
+    Title="Sync"
     Height="600"
     Width="500"
     MinWidth="360"
@@ -14,42 +14,57 @@
 
     <Grid>
         <TabControl Name="tabControl1">
-            <TabItem Header="控制面板">
+            <TabItem Header="主面板">
                 <Grid>
-                    <Button Height="29" HorizontalAlignment="Left" Margin="6,93,0,0" Name="btnCompare" VerticalAlignment="Top" Width="85" Click="btnCompare_Click">比对</Button>
+                    <Button Height="23" Margin="64,61,0,0" Name="btnCompare" VerticalAlignment="Top" Click="btnCompare_Click" HorizontalAlignment="Left" Width="110">比较两个文件夹</Button>
                 </Grid>
             </TabItem>
             <TabItem Header="A">
                 <Grid>
-                    <sync:FolderTreeView x:Name="treeAony" Margin="0,60,0,0" />
+                    <Button HorizontalAlignment="Left" Margin="64,62,0,0" Name="btnCopy_a" Width="75" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnCopy_a_Click">复制 &gt;&gt;</Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,61,0" Name="btnRCopy_a" Width="80" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,0,0" Name="btnDelete_a" Width="55" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnDelete_a_Click">删除</Button>
+                    <sync:FolderTreeView x:Name="treeAonly" Margin="0,93,0,0" />
                 </Grid>
             </TabItem>
             <TabItem Header="A &gt; B">
                 <Grid>
-                    <sync:FolderTreeView x:Name="treeAnewer" Margin="0,60,0,0" />
+                    <Button HorizontalAlignment="Left" Margin="64,62,0,0" Name="btnCopy_an" Width="75" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnCopy_an_Click">复制 &gt;&gt;</Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,61,0" Name="btnRCopy_an" Width="80" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnRCopy_an_Click">&lt;&lt; 反向复制</Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,0,0" Name="btnDelete_an" Width="55" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
+                    <sync:FolderTreeView x:Name="treeAnewer" Margin="0,93,0,0" />
                 </Grid>
             </TabItem>
             <TabItem Header="A = B">
                 <Grid>
-                    <sync:FolderTreeView x:Name="treeAB" Margin="0,60,0,0" />
+                    <Button HorizontalAlignment="Left" Margin="64,62,0,0" Name="btnCopy_ab" Width="75" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,61,0" Name="btnRCopy_ab" Width="80" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,0,0" Name="btnDelete_ab" Width="55" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnDelete_ab_Click">删除</Button>
+                    <sync:FolderTreeView x:Name="treeAB" Margin="0,93,0,0" />
                 </Grid>
             </TabItem>
             <TabItem Header="A &lt; B">
                 <Grid>
-                    <sync:FolderTreeView x:Name="treeBnewer" Margin="0,60,0,0" />
+                    <Button HorizontalAlignment="Left" Margin="64,62,0,0" Name="btnCopy_bn" Width="75" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnCopy_bn_Click">&lt;&lt; 复制</Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,61,0" Name="btnRCopy_bn" Width="80" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnRCopy_bn_Click">反向复制 &gt;&gt;</Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,0,0" Name="btnDelete_bn" Width="55" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
+                    <sync:FolderTreeView x:Name="treeBnewer" Margin="0,93,0,0" />
                 </Grid>
             </TabItem>
             <TabItem Header="B">
                 <Grid>
-                    <sync:FolderTreeView x:Name="treeBonly" Margin="0,60,0,0" />
+                    <Button HorizontalAlignment="Left" Margin="64,62,0,0" Name="btnCopy_b" Width="75" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnCopy_b_Click">&lt;&lt; 复制</Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,61,0" Name="btnRCopy_b" Width="80" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,0,0" Name="btnDelete_b" Width="55" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnDelete_b_Click">删除</Button>
+                    <sync:FolderTreeView x:Name="treeBonly" Margin="0,93,0,0" />
                 </Grid>
             </TabItem>
         </TabControl>
 
-        <Label Height="28" HorizontalAlignment="Left" Margin="6,30,0,0" VerticalAlignment="Top" Width="57">文件夹 A</Label>
+        <Label Height="23" HorizontalAlignment="Left" Margin="6,30,0,0" VerticalAlignment="Top" Width="60">文件夹 A</Label>
         <TextBox Height="23" Margin="69,30,6,0" Name="textDirA" VerticalAlignment="Top"></TextBox>
 
-        <Label Height="28" HorizontalAlignment="Left" Margin="6,58,0,0" VerticalAlignment="Top" Width="57">文件夹 B</Label>
+        <Label Height="23" HorizontalAlignment="Left" Margin="6,58,0,0" VerticalAlignment="Top" Width="60">文件夹 B</Label>
         <TextBox Height="23" Margin="69,58,6,0" Name="textDirB" VerticalAlignment="Top"></TextBox>
     </Grid>
 </Window>

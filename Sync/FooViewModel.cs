@@ -13,7 +13,7 @@ namespace TreeViewWithCheckBoxes
         private const string ICON_FOLDER_OPEN = "Images/folder_open.png";
         private const string ICON_FILE = "Images/file.png";
 
-        private enum ItemType
+        public enum ItemType
         {
             ITEM_TYPE_VIRTUALROOT,
             ITEM_TYPE_PLACEHOLDER,
@@ -101,6 +101,16 @@ namespace TreeViewWithCheckBoxes
         }
 
         #region Properties
+
+        public ItemType Type
+        {
+            get { return _itemType; }
+        }
+
+        public string Fullpath
+        {
+            get { return _fullpath; }
+        }
 
         public List<FooViewModel> Children { get; private set; }
 
