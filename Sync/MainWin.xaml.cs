@@ -52,7 +52,6 @@ namespace Sync
 
         Config _config;
         BackgroundWorker _worker;
-        bool _cancel;
         int _progress;
 
         ISimpleFS aFS;
@@ -108,8 +107,6 @@ namespace Sync
 
         private void btnCompare_Click( object sender, RoutedEventArgs e )
         {
-            // TODO: 所有按钮状态复位
-
             aFS = createFS( textDirA.Text );
             bFS = createFS( textDirB.Text );
 
@@ -122,16 +119,22 @@ namespace Sync
             FooViewModel rootBnewer = FooViewModel.CreateRootItem( "在B中较新的文件", null );   //
             FooViewModel rootBonly = FooViewModel.CreateRootItem( "仅在B中存在的文件", bFS );
 
+            // 根据节点的选择情况设置操作按钮的使能状态
+            connectModelToButtons( rootAonly, new Button[] { btnCopy_a, btnDelete_a } );
+            connectModelToButtons( rootAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
+            connectModelToButtons( rootAB, new Button[] { btnDelete_ab } );
+            connectModelToButtons( rootBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
+            connectModelToButtons( rootBonly, new Button[] { btnCopy_b, btnDelete_b } );
+
             SimpleDirInfo dirA = new SimpleDirInfo( aFS );
             SimpleDirInfo dirB = new SimpleDirInfo( bFS );
 
             ProcessDlgWorkingHandler fnWorking = delegate( BackgroundWorker worker ) {
                 _worker = worker;
-                _cancel = false;
                 _progress = 0;
                 compareTree( dirA, dirB, rootAonly, rootAnewer, rootAB, rootBnewer, rootBonly );
 
-                return _cancel;
+                return false;
             };
 
             ProcessDlgFinishHandler fnFinish = delegate() {
@@ -153,18 +156,15 @@ namespace Sync
             ProcessDlg dlg = new ProcessDlg( fnWorking, fnFinish );
             dlg.Owner = this;
             dlg.ShowDialog();
-
-            // 根据节点的选择情况设置操作按钮的使能状态
-            connectModelToButtons( rootAonly, new Button[] { btnCopy_a, btnDelete_a } );
-            connectModelToButtons( rootAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
-            connectModelToButtons( rootAB, new Button[] { btnDelete_ab } );
-            connectModelToButtons( rootBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
-            connectModelToButtons( rootBonly, new Button[] { btnCopy_b, btnDelete_b } );
         }
 
         private void connectModelToButtons( FooViewModel model, Button[] buttons )
         {
-            PropertyChangedEventHandler h = delegate( object m, PropertyChangedEventArgs ev ) {
+            foreach ( Button btn in buttons ) {
+                btn.IsEnabled = false;
+            }
+
+            model.PropertyChanged += ( object m, PropertyChangedEventArgs ev ) => {
                 if ( ev.PropertyName != "IsChecked" )
                     return;
                 bool en = !model.IsChecked.HasValue || (bool)model.IsChecked;
@@ -172,20 +172,14 @@ namespace Sync
                     btn.IsEnabled = en;
                 }
             };
-            model.PropertyChanged += h;
         }
 
         private void compareTree( SimpleDirInfo dirA, SimpleDirInfo dirB, FooViewModel parentAonly, FooViewModel parentAnewer, FooViewModel parentAB, FooViewModel parentBnewer, FooViewModel parentBonly )
         {
-            if ( _worker.CancellationPending || _cancel ) {
-                _cancel = true;
+            if ( _worker.CancellationPending ) {
                 return;
             }
-
-            _worker.ReportProgress( _progress++ );
-            if ( _progress > 100 ) {
-                _progress = 0;
-            }
+            _worker.ReportProgress( 1 );
 
             // 读取 A、B 的所有子项
             SortedList<string, SimpleInfoBase> aChildren = dirA.getChildren();
@@ -327,33 +321,10 @@ namespace Sync
             }
         }
 
-        // 遍历一个 model 以收集其全部选中的项目（子目录、文件）
-        private void walkModelTree( FooViewModel model, List<string> colls, string path )
-        {
-            if ( model.IsChecked.HasValue && !(bool)model.IsChecked )
-                return;
-            if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FOLDER ) {
-                if ( model.Fullpath.Length > 0 ) {
-                    // 尚未展开的子目录（以 / 结尾代表其下游全部内容）
-                    colls.Add( path + model.Name + "/" );
-                } else {
-                    // 已经展开的子目录
-                    foreach ( FooViewModel sub in model.Children ) {
-                        walkModelTree( sub, colls, path + model.Name + "/" );
-                    }
-                }
-            } else if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FILE ) {
-                // 文件
-                colls.Add( path + model.Name );
-            }
-        }
-
         private void doCopy( FooViewModel model, ISimpleFS from, ISimpleFS to )
         {
-            List<string> colls = new List<string>();
-            foreach ( FooViewModel sub in model.Children ) {
-                walkModelTree( sub, colls, "/" );
-            }
+            List<string> colls = TreeWalker.walk( model, this, from );
+
             System.Console.WriteLine( "copy from: " + from.ToString() );
             System.Console.WriteLine( "copy to  : " + to.ToString() );
             foreach ( string path in colls ) {
@@ -363,10 +334,8 @@ namespace Sync
 
         private void doDelete( FooViewModel model, ISimpleFS from )
         {
-            List<string> colls = new List<string>();
-            foreach ( FooViewModel sub in model.Children ) {
-                walkModelTree( sub, colls, "/" );
-            }
+            List<string> colls = TreeWalker.walk( model, this, from );
+
             System.Console.WriteLine( "delete from: " + from.ToString() );
             foreach ( string path in colls ) {
                 System.Console.WriteLine( "    " + path );
@@ -426,6 +395,87 @@ namespace Sync
         {
             FooViewModel model = ( (List<FooViewModel>)treeBonly.DataContext ).First<FooViewModel>();
             doDelete( model, bFS );
+        }
+    }
+
+    // 遍历一个 model 以收集其全部选中的项目（子目录、文件）
+    public class TreeWalker
+    {
+        static public List<string> walk( FooViewModel vroot, Window owner, ISimpleFS fs )
+        {
+            TreeWalker walker = new TreeWalker( fs );
+            walker._colls = new List<string>();
+            ProcessDlgWorkingHandler fnWorking = delegate( BackgroundWorker worker ) {
+                walker._worker = worker;
+                foreach ( FooViewModel sub in vroot.Children ) {
+                    walker.walkModelRecur( sub, "/" );
+                }
+                return false;
+            };
+
+            ProcessDlgFinishHandler fnFinish = delegate() {
+            };
+
+            ProcessDlg dlg = new ProcessDlg( fnWorking, fnFinish );
+            dlg.Owner = owner;
+            dlg.ShowDialog();
+
+            return walker._colls;
+        }
+
+        BackgroundWorker _worker;
+        List<string> _colls;
+        ISimpleFS _fs;
+
+        private TreeWalker( ISimpleFS fs )
+        {
+            _colls = new List<string>();
+            _fs = fs;
+        }
+
+        private void walkModelRecur( FooViewModel model, string path )
+        {
+            if ( _worker.CancellationPending ) {
+                return;
+            }
+            _worker.ReportProgress( 0 );
+
+            if ( model.IsChecked.HasValue && !(bool)model.IsChecked )
+                return;
+            if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FOLDER ) {
+                if ( model.Fullpath.Length > 0 ) {
+                    // 尚未展开的子目录，用 FS 继续递归遍历
+                    walkFsRecur( path + model.Name + "/" );
+                } else {
+                    // 已经展开的子目录
+                    foreach ( FooViewModel sub in model.Children ) {
+                        walkModelRecur( sub, path + model.Name + "/" );
+                    }
+                }
+            } else if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FILE ) {
+                // 文件
+                _colls.Add( path + model.Name );
+            }
+        }
+
+        private void walkFsRecur( string path )
+        {
+            if ( _worker.CancellationPending ) {
+                return;
+            }
+            _worker.ReportProgress( 0 );
+
+            foreach ( KeyValuePair<string, SimpleInfoBase> item in _fs.getChildren( path ) ) {
+                string name = item.Key;
+                SimpleInfoBase value = item.Value;
+                if ( value.GetType() == typeof( SimpleDirInfo ) ) {
+                    // 子目录
+                    walkFsRecur( path + name + "/" );
+                } else {
+                    // 文件
+                    _colls.Add( path + name );
+                }
+            }
         }
     }
 }

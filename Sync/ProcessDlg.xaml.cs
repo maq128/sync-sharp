@@ -39,9 +39,7 @@ namespace Sync
             // delegate 语法
             _worker.DoWork += delegate( object sender, DoWorkEventArgs e ) {
                 // 这段代码将在辅助线程中执行
-                if ( fnWorking( (BackgroundWorker)sender ) ) {
-                    e.Cancel = true;
-                }
+                fnWorking( (BackgroundWorker)sender );
             };
 
             // lambda 语法
@@ -72,7 +70,11 @@ namespace Sync
 
                 fnFinish();
             };
+        }
 
+        private void Window_Loaded( object sender, RoutedEventArgs e )
+        {
+            if ( _worker.IsBusy ) return;
             _worker.RunWorkerAsync();
         }
 
