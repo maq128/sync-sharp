@@ -84,6 +84,15 @@ namespace Sync
             return result;
         }
 
+        public void copyFileOut( string sourcePath, string realpath )
+        {
+        }
+
+        public bool copyFileIn( string destPath, ISimpleFS sourceFS )
+        {
+            return true;
+        }
+
         override public string ToString()
         {
             return this._root;

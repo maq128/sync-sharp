@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Collections.Generic;
 
@@ -37,10 +38,40 @@ namespace Sync
             return result;
         }
 
+        private void createDirIfNecessary( string dir )
+        {
+            if ( Directory.Exists( dir ) )
+                return;
+            createDirIfNecessary( Path.GetDirectoryName( dir ) );
+            Directory.CreateDirectory( dir );
+        }
+
+        public void copyFileOut( string sourcePath, string realpath )
+        {
+            string sourceFileName = this._root + sourcePath;
+            string destFileName = realpath;
+            createDirIfNecessary( Path.GetDirectoryName( destFileName ) );
+            File.Copy( sourceFileName, destFileName, true );
+        }
+
+        public bool copyFileIn( string destPath, ISimpleFS sourceFS )
+        {
+            string destFileName = this._root + destPath;
+            string tempFileName = destFileName + ".sync.temp";
+            try {
+                sourceFS.copyFileOut( destPath, tempFileName );
+                File.Delete( destFileName );
+                File.Move( tempFileName, destFileName );
+            } catch ( Exception ) {
+                File.Delete( tempFileName );
+                return false;
+            }
+            return true;
+        }
+
         override public string ToString()
         {
             return this._root;
         }
     }
-
 }

@@ -80,5 +80,19 @@ namespace Sync
         /// 根据返回结果集中对象的类型（SimpleDirInfo/SimpleFileInfo）可以区分子目录还是文件。
         /// </summary>
         SortedList<string, SimpleInfoBase> getChildren( string path );
+
+        /// <summary>
+        /// 把 frompath 指定的文件复制到 realpath 指定的位置。
+        /// sourcePath 为 FS 内部的绝对路径。
+        /// realpath 为本地硬盘的绝对路径。
+        /// </summary>
+        void copyFileOut( string sourcePath, string realpath );
+
+        /// <summary>
+        /// 把 topath 指定的文件从 sourceFS 复制到本 FS。
+        /// destPath 为 FS 内部的绝对路径。
+        /// sourceFS 为源 FS。
+        /// </summary>
+        bool copyFileIn( string destPath, ISimpleFS sourceFS );
     }
 }

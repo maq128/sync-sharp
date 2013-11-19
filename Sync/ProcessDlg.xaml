@@ -4,7 +4,7 @@
     Title="正在处理……"
     Height="104"
     Width="300"
-    WindowStartupLocation="CenterOwner" Loaded="Window_Loaded">
+    WindowStartupLocation="CenterOwner" Loaded="Window_Loaded" Closed="Window_Closed">
     <Grid>
         <ProgressBar Height="10" Margin="12,12,12,0" Name="progressBar1" VerticalAlignment="Top" Orientation="Horizontal" Value="0" />
         <Button Height="23" Margin="104,0,99,12" Name="btn" VerticalAlignment="Bottom" Click="btn_Click">停止</Button>

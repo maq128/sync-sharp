@@ -18,18 +18,18 @@ using System.IO;
 
 namespace Sync
 {
-    public delegate bool ProcessDlgWorkingHandler( BackgroundWorker worker );
-    public delegate void ProcessDlgFinishHandler();
-
     /// <summary>
     /// ProcessDlg.xaml 的交互逻辑
     /// </summary>
     public partial class ProcessDlg : Window
     {
         BackgroundWorker _worker;
+        bool _isShown;
 
-        public ProcessDlg( ProcessDlgWorkingHandler fnWorking, ProcessDlgFinishHandler fnFinish )
+        public ProcessDlg( DoWorkEventHandler fnWorking, Window owner )
         {
+            this.Owner = owner;
+            this._isShown = false;
             InitializeComponent();
 
             _worker = new BackgroundWorker();
@@ -37,10 +37,7 @@ namespace Sync
             _worker.WorkerSupportsCancellation = true;
 
             // delegate 语法
-            _worker.DoWork += delegate( object sender, DoWorkEventArgs e ) {
-                // 这段代码将在辅助线程中执行
-                fnWorking( (BackgroundWorker)sender );
-            };
+            _worker.DoWork += fnWorking;
 
             // lambda 语法
             int per = (int)progressBar1.Minimum;
@@ -55,31 +52,41 @@ namespace Sync
             // delegate 语法
             _worker.RunWorkerCompleted += delegate( Object sender, RunWorkerCompletedEventArgs e ) {
                 // 这段代码将在主线程中执行
-                this.Close();
 
-                if ( e.Error != null ) {
-                    //Debug.WriteLine( "BackgroundWorker: " + e.Error.ToString() );
-                    MessageBox.Show( e.Error.Message, "失败" );
-                    return;
+                if ( this._isShown ) {
+                    // 这是任务正常执行完或者是点击“取消”的情形
+                    this.DialogResult = e.Error == null && !e.Cancelled;
+                    this.Close();
+                } else {
+                    // 这是直接关闭 ProcessDlg 窗口的情形
                 }
 
-                if ( e.Cancelled ) {
-                    //Debug.WriteLine( "BackgroundWorker: canceled." );
+                if ( e.Error != null && !e.Cancelled ) {
+                    MessageBox.Show( this.Owner, e.Error.Message, "失败" );
                     return;
                 }
-
-                fnFinish();
             };
         }
 
         private void Window_Loaded( object sender, RoutedEventArgs e )
         {
             if ( _worker.IsBusy ) return;
+            this._isShown = true;
+
+            // 请求启动 worker
             _worker.RunWorkerAsync();
         }
 
         private void btn_Click( object sender, RoutedEventArgs e )
         {
+            // 请求中止 worker
+            _worker.CancelAsync();
+        }
+
+        private void Window_Closed( object sender, EventArgs e )
+        {
+            this._isShown = false;
+            // 请求中止 worker
             _worker.CancelAsync();
         }
     }

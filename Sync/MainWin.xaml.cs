@@ -52,7 +52,6 @@ namespace Sync
 
         Config _config;
         BackgroundWorker _worker;
-        int _progress;
 
         ISimpleFS aFS;
         ISimpleFS bFS;
@@ -105,8 +104,32 @@ namespace Sync
             return new LocalFS( name );
         }
 
+        private void connectModelToButtons( FooViewModel model, Button[] buttons )
+        {
+            foreach ( Button btn in buttons ) {
+                btn.IsEnabled = false;
+            }
+
+            model.PropertyChanged += ( object m, PropertyChangedEventArgs ev ) => {
+                if ( ev.PropertyName != "IsChecked" )
+                    return;
+                bool en = !model.IsChecked.HasValue || (bool)model.IsChecked;
+                foreach ( Button btn in buttons ) {
+                    btn.IsEnabled = en;
+                }
+            };
+        }
+
         private void btnCompare_Click( object sender, RoutedEventArgs e )
         {
+            // 清空列表控件
+            treeAonly.DataContext = new List<FooViewModel>();
+            treeAnewer.DataContext = new List<FooViewModel>();
+            treeAB.DataContext = new List<FooViewModel>();
+            treeBnewer.DataContext = new List<FooViewModel>();
+            treeBonly.DataContext = new List<FooViewModel>();
+
+            // 创建文件系统访问对象
             aFS = createFS( textDirA.Text );
             bFS = createFS( textDirB.Text );
 
@@ -129,55 +152,43 @@ namespace Sync
             SimpleDirInfo dirA = new SimpleDirInfo( aFS );
             SimpleDirInfo dirB = new SimpleDirInfo( bFS );
 
-            ProcessDlgWorkingHandler fnWorking = delegate( BackgroundWorker worker ) {
-                _worker = worker;
-                _progress = 0;
-                compareTree( dirA, dirB, rootAonly, rootAnewer, rootAB, rootBnewer, rootBonly );
-
-                return false;
+            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
+                // 这段代码将在辅助线程中执行
+                _worker = (BackgroundWorker)worker;
+                try {
+                    compareTree( dirA, dirB, rootAonly, rootAnewer, rootAB, rootBnewer, rootBonly );
+                } catch ( System.Exception ex ) {
+                    // 如果不是因为主动要求中止，则向外抛错
+                    if ( ! _worker.CancellationPending ) {
+                        throw ex;
+                    }
+                }
+                ev.Cancel = _worker.CancellationPending;
             };
 
-            ProcessDlgFinishHandler fnFinish = delegate() {
-                rootAonly.IsExpanded = true;
-                rootAnewer.IsExpanded = true;
-                rootAB.IsExpanded = true;
-                rootBnewer.IsExpanded = true;
-                rootBonly.IsExpanded = true;
-
+            ProcessDlg dlg = new ProcessDlg( fnWorking, this );
+            bool? finished = dlg.ShowDialog();
+            if ( finished.HasValue && (bool)finished ) {
                 treeAonly.DataContext = new List<FooViewModel> { rootAonly };
                 treeAnewer.DataContext = new List<FooViewModel> { rootAnewer };
                 treeAB.DataContext = new List<FooViewModel> { rootAB };
                 treeBnewer.DataContext = new List<FooViewModel> { rootBnewer };
                 treeBonly.DataContext = new List<FooViewModel> { rootBonly };
 
+                rootAonly.IsExpanded = true;
+                rootAnewer.IsExpanded = true;
+                rootAB.IsExpanded = true;
+                rootBnewer.IsExpanded = true;
+                rootBonly.IsExpanded = true;
+
                 tabControl1.SelectedIndex = 2;
-            };
-
-            ProcessDlg dlg = new ProcessDlg( fnWorking, fnFinish );
-            dlg.Owner = this;
-            dlg.ShowDialog();
-        }
-
-        private void connectModelToButtons( FooViewModel model, Button[] buttons )
-        {
-            foreach ( Button btn in buttons ) {
-                btn.IsEnabled = false;
             }
-
-            model.PropertyChanged += ( object m, PropertyChangedEventArgs ev ) => {
-                if ( ev.PropertyName != "IsChecked" )
-                    return;
-                bool en = !model.IsChecked.HasValue || (bool)model.IsChecked;
-                foreach ( Button btn in buttons ) {
-                    btn.IsEnabled = en;
-                }
-            };
         }
 
         private void compareTree( SimpleDirInfo dirA, SimpleDirInfo dirB, FooViewModel parentAonly, FooViewModel parentAnewer, FooViewModel parentAB, FooViewModel parentBnewer, FooViewModel parentBonly )
         {
             if ( _worker.CancellationPending ) {
-                return;
+                throw new System.Exception( "取消了操作" );
             }
             _worker.ReportProgress( 1 );
 
@@ -323,18 +334,46 @@ namespace Sync
 
         private void doCopy( FooViewModel model, ISimpleFS from, ISimpleFS to )
         {
+            // 收集出所有待复制的文件
             List<string> colls = TreeWalker.walk( model, this, from );
+            if ( colls == null )
+                return;
 
-            System.Console.WriteLine( "copy from: " + from.ToString() );
-            System.Console.WriteLine( "copy to  : " + to.ToString() );
-            foreach ( string path in colls ) {
-                System.Console.WriteLine( "    " + path );
+            // 逐个复制文件
+            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
+                BackgroundWorker _worker = (BackgroundWorker)worker;
+                foreach ( string path in colls ) {
+                    if ( _worker.CancellationPending )
+                        break;
+                    _worker.ReportProgress( 0 );
+
+                    bool ok = to.copyFileIn( path, from );
+                    if ( !ok ) {
+                        MessageBoxResult res = MessageBox.Show(
+                            this,
+                            "无法复制以下文件：\r\n  " + path + "\r\n\r\n要继续复制其余的文件吗？\r\n点击“取消”将停止复制。",
+                            "操作失败",
+                            MessageBoxButton.OKCancel,
+                            MessageBoxImage.Error
+                        );
+                        if ( res != MessageBoxResult.OK )
+                            break;
+                    }
+                }
+                ev.Cancel = _worker.CancellationPending;
+            };
+
+            ProcessDlg dlg = new ProcessDlg( fnWorking, this );
+            bool? finished = dlg.ShowDialog();
+            if ( finished.HasValue && (bool)finished ) {
             }
         }
 
         private void doDelete( FooViewModel model, ISimpleFS from )
         {
             List<string> colls = TreeWalker.walk( model, this, from );
+            if ( colls == null )
+                return;
 
             System.Console.WriteLine( "delete from: " + from.ToString() );
             foreach ( string path in colls ) {
@@ -405,22 +444,28 @@ namespace Sync
         {
             TreeWalker walker = new TreeWalker( fs );
             walker._colls = new List<string>();
-            ProcessDlgWorkingHandler fnWorking = delegate( BackgroundWorker worker ) {
-                walker._worker = worker;
-                foreach ( FooViewModel sub in vroot.Children ) {
-                    walker.walkModelRecur( sub, "/" );
+            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
+                walker._worker = (BackgroundWorker)worker;
+                try {
+                    foreach ( FooViewModel sub in vroot.Children ) {
+                        walker.walkModelRecur( sub, "/" );
+                    }
+                } catch ( System.Exception ex ) {
+                    // 如果不是因为主动要求中止，则向外抛错
+                    if ( !walker._worker.CancellationPending ) {
+                        throw ex;
+                    }
                 }
-                return false;
+                ev.Cancel = walker._worker.CancellationPending;
             };
 
-            ProcessDlgFinishHandler fnFinish = delegate() {
-            };
+            ProcessDlg dlg = new ProcessDlg( fnWorking, owner );
+            bool? finished = dlg.ShowDialog();
+            if ( finished.HasValue && (bool)finished ) {
+                return walker._colls;
+            }
 
-            ProcessDlg dlg = new ProcessDlg( fnWorking, fnFinish );
-            dlg.Owner = owner;
-            dlg.ShowDialog();
-
-            return walker._colls;
+            return null;
         }
 
         BackgroundWorker _worker;
@@ -461,7 +506,7 @@ namespace Sync
         private void walkFsRecur( string path )
         {
             if ( _worker.CancellationPending ) {
-                return;
+                throw new System.Exception( "取消了操作" );
             }
             _worker.ReportProgress( 0 );
 
