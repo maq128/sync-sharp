@@ -375,9 +375,24 @@ namespace Sync
             if ( colls == null )
                 return;
 
-            System.Console.WriteLine( "delete from: " + from.ToString() );
-            foreach ( string path in colls ) {
-                System.Console.WriteLine( "    " + path );
+             System.Console.WriteLine( "delete from: " + from.ToString() );
+
+            // 逐个删除文件
+            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
+                BackgroundWorker _worker = (BackgroundWorker)worker;
+                foreach ( string path in colls ) {
+                    if ( _worker.CancellationPending )
+                        break;
+                    _worker.ReportProgress( 0 );
+
+                    System.Console.WriteLine( "    " + path );
+                }
+                ev.Cancel = _worker.CancellationPending;
+            };
+
+            ProcessDlg dlg = new ProcessDlg( fnWorking, this );
+            bool? finished = dlg.ShowDialog();
+            if ( finished.HasValue && (bool)finished ) {
             }
         }
 

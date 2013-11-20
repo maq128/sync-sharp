@@ -52,6 +52,8 @@ namespace Sync
             string destFileName = realpath;
             createDirIfNecessary( Path.GetDirectoryName( destFileName ) );
             File.Copy( sourceFileName, destFileName, true );
+            // ²Î¿¼×ÊÁÏ
+            // http://www.pinvoke.net/default.aspx/kernel32.CopyFileEx
         }
 
         public bool copyFileIn( string destPath, ISimpleFS sourceFS )
