@@ -59,8 +59,17 @@ namespace WebDav {
             /// <param name="path">Path to the resource.</param>
             /// <returns>Resource corresponding to requested path.</returns>
             public IResource OpenResource(Uri path) {
-                IFolder folder = this.OpenFolder(path);
-                return folder.GetResource(path.Segments[path.Segments.Length - 1]);
+//                 IFolder folder = this.OpenFolder( path );
+//                 return folder.GetResource(path.Segments[path.Segments.Length - 1]);
+
+                // 取 path 的“父目录”路径
+                string folderpath = path.AbsoluteUri;
+                var pos = folderpath.LastIndexOf( '/' );
+                if ( pos > 0 ) {
+                    folderpath = folderpath.Substring( 0, pos + 1 );
+                }
+                IFolder folder = this.OpenFolder( folderpath );
+                return folder.GetResource( System.Web.HttpUtility.UrlDecode( path.Segments[path.Segments.Length - 1] ) );
             }
 		}
 	}

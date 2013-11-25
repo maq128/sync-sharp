@@ -58,7 +58,7 @@ namespace Sync
 
         public bool copyFileIn( string destPath, ISimpleFS sourceFS )
         {
-            string destFileName = this._root + destPath;
+            string destFileName = Path.GetFullPath( this._root + destPath );
             string tempFileName = destFileName + ".sync.temp";
             try {
                 sourceFS.copyFileOut( destPath, tempFileName );

@@ -201,8 +201,8 @@ namespace WebDav {
 								case "href":
 									string href = XmlCurrentNode.InnerText;
 									if (!Regex.Match(href, "^https?:\\/\\/").Success) {
-                                        // 原代码漏掉了对于 port 的处理
-                                        href = this._path.Scheme + "://" + this._path.Host + ( this._path.Port == 80 ? "" : ":" + System.Convert.ToString( this._path.Port ) ) + href;
+										// 原代码漏掉了对于 port 的处理
+										href = this._path.Scheme + "://" + this._path.Host + ( this._path.IsDefaultPort ? "" : ":" + System.Convert.ToString( this._path.Port ) ) + href;
 									}
 									item.SetHref(href, this._path);
 									break;

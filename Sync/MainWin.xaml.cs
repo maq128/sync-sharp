@@ -349,6 +349,7 @@ namespace Sync
 
                     bool ok = to.copyFileIn( path, from );
                     if ( !ok ) {
+                        // FIXME: 这里辅助线程不能正确显示 UI 对话框
                         MessageBoxResult res = MessageBox.Show(
                             this,
                             "无法复制以下文件：\r\n  " + path + "\r\n\r\n要继续复制其余的文件吗？\r\n点击“取消”将停止复制。",

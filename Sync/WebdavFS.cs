@@ -86,6 +86,16 @@ namespace Sync
 
         public void copyFileOut( string sourcePath, string realpath )
         {
+            string url = this._root;
+            if ( sourcePath.StartsWith( "/" ) ) {
+                url += sourcePath.Substring( 1 );
+            } else {
+                url += sourcePath;
+            }
+            WebDavSession sess = new WebDavSession();
+            sess.Credentials = this._session.Credentials;
+            IResource file = sess.OpenResource( url );
+            file.Download( realpath );
         }
 
         public bool copyFileIn( string destPath, ISimpleFS sourceFS )

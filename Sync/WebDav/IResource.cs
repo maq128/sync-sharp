@@ -38,6 +38,7 @@ namespace WebDav {
 			/// <param name="filename">Full path of a file to be downloaded to</param>
 			public void Download(string filename) {
 				WebClient webClient = new WebClient();
+				webClient.Credentials = this._credentials;
 				webClient.DownloadFile(this._href, filename);
 			}
 
