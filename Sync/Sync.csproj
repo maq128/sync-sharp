@@ -124,6 +124,7 @@
     <Compile Include="WebdavAuthDlg.xaml.cs">
       <DependentUpon>WebdavAuthDlg.xaml</DependentUpon>
     </Compile>
+    <Compile Include="WebDAVClient.cs" />
     <Compile Include="WebdavFS.cs" />
     <Compile Include="WebDav\Exceptions\UnauthorizedException.cs" />
     <Compile Include="WebDav\Exceptions\WebDavException.cs" />
