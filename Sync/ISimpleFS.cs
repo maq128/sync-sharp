@@ -5,6 +5,8 @@ namespace Sync
 {
     public class SimpleInfoBase
     {
+        public ISimpleFS rootFS;
+
         // 不带路径的名字
         public string Name;
 
@@ -16,7 +18,6 @@ namespace Sync
 
     public class SimpleDirInfo : SimpleInfoBase
     {
-        public ISimpleFS rootFS;
         public SimpleDirInfo( ISimpleFS rootFS )
         {
             this.rootFS = rootFS;
@@ -64,6 +65,24 @@ namespace Sync
     {
         public DateTime LastWriteTime;
         public long Length;
+
+        public SimpleFileInfo( ISimpleFS rootFS )
+        {
+            this.rootFS = rootFS;
+            this.Name = "";
+            this.FullName = "";
+            this.LastWriteTime = new DateTime();
+            this.Length = 0;
+        }
+
+        public SimpleFileInfo( SimpleFileInfo other )
+        {
+            this.rootFS = other.rootFS;
+            this.Name = other.Name;
+            this.FullName = other.FullName;
+            this.LastWriteTime = other.LastWriteTime;
+            this.Length = other.Length;
+        }
     }
 
     /* 简单的文件系统访问接口。
@@ -82,17 +101,16 @@ namespace Sync
         SortedList<string, SimpleInfoBase> getChildren( string path );
 
         /// <summary>
-        /// 把 frompath 指定的文件复制到 realpath 指定的位置。
-        /// sourcePath 为 FS 内部的绝对路径。
+        /// 把 sourcePath 指定的文件复制到 realpath 指定的位置。
+        /// sourcePath 为本 FS 内部的绝对路径。
         /// realpath 为本地硬盘的绝对路径。
         /// </summary>
         void copyFileOut( string sourcePath, string realpath );
 
         /// <summary>
-        /// 把 topath 指定的文件从 sourceFS 复制到本 FS。
-        /// destPath 为 FS 内部的绝对路径。
-        /// sourceFS 为源 FS。
+        /// 把 source 指定的文件从其所在的 FS 复制到本 FS。
+        /// source 为源文件。
         /// </summary>
-        bool copyFileIn( string destPath, ISimpleFS sourceFS );
+        bool copyFileIn( SimpleFileInfo source );
     }
 }

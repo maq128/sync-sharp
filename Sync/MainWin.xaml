@@ -39,7 +39,7 @@
                 <Grid>
                     <Button HorizontalAlignment="Left" Margin="64,62,0,0" Name="btnCopy_ab" Width="75" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
                     <Button HorizontalAlignment="Right" Margin="0,62,61,0" Name="btnRCopy_ab" Width="80" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
-                    <Button HorizontalAlignment="Right" Margin="0,62,0,0" Name="btnDelete_ab" Width="55" Height="23" VerticalAlignment="Top" IsEnabled="False" Click="btnDelete_ab_Click">删除</Button>
+                    <Button HorizontalAlignment="Right" Margin="0,62,0,0" Name="btnDelete_ab" Width="55" Height="23" VerticalAlignment="Top" IsEnabled="False"></Button>
                     <sync:FolderTreeView x:Name="treeAB" Margin="0,93,0,0" />
                 </Grid>
             </TabItem>

@@ -28,14 +28,18 @@ namespace TreeViewWithCheckBoxes
         bool _isExpanded = false;
         public FooViewModel _parent;
 
-        #endregion // Data
-
         ISimpleFS _rootFS;
+        SimpleInfoBase _fsoInfo;
+
+        #endregion // Data
 
         // 创建根项
         public static FooViewModel CreateRootItem( string name, ISimpleFS rootFS )
         {
-            FooViewModel item = new FooViewModel( name, rootFS ) {
+            SimpleDirInfo info = new SimpleDirInfo( rootFS );
+            info.Name = name;
+            info.FullName = "/";
+            FooViewModel item = new FooViewModel( info ) {
                 _itemType = ItemType.ITEM_TYPE_VIRTUALROOT,
                 Icon = ICON_VIRTUALROOT,
             };
@@ -43,9 +47,9 @@ namespace TreeViewWithCheckBoxes
         }
 
         // 创建一个目录子项（用懒加载）
-        public FooViewModel CreateLazyFolderItem( string name, string fullpath )
+        public FooViewModel CreateLazyFolderItem( SimpleInfoBase info )
         {
-            FooViewModel subItem = new FooViewModel( name, this._rootFS ) {
+            FooViewModel subItem = new FooViewModel( info ) {
                 _parent = this,
                 _itemType = ItemType.ITEM_TYPE_FOLDER,
                 Icon = ICON_FOLDER_CLOSE,
@@ -54,8 +58,8 @@ namespace TreeViewWithCheckBoxes
                 subItem._isChecked = true;
             }
 
-            subItem._fullpath = fullpath;
-            subItem.Children.Add( new FooViewModel( "", this._rootFS ) {
+            subItem._fullpath = info.FullName;
+            subItem.Children.Add( new FooViewModel( new SimpleDirInfo( null ) ) {
                 _itemType = ItemType.ITEM_TYPE_PLACEHOLDER,
                 Icon = ICON_PLACEHOLDER,
                 CbVisibility = "Collapsed",
@@ -64,9 +68,9 @@ namespace TreeViewWithCheckBoxes
         }
 
         // 创建一个目录子项（不用懒加载）
-        public FooViewModel CreateFolderItem( string name )
+        public FooViewModel CreateFolderItem( SimpleInfoBase info )
         {
-            FooViewModel subItem = new FooViewModel( name, this._rootFS ) {
+            FooViewModel subItem = new FooViewModel( info ) {
                 _parent = this,
                 _itemType = ItemType.ITEM_TYPE_FOLDER,
                 Icon = ICON_FOLDER_CLOSE,
@@ -78,9 +82,9 @@ namespace TreeViewWithCheckBoxes
         }
 
         // 创建一个文件子项
-        public FooViewModel CreateFileItem( string name )
+        public FooViewModel CreateFileItem( SimpleInfoBase info )
         {
-            FooViewModel subItem = new FooViewModel( name, this._rootFS ) {
+            FooViewModel subItem = new FooViewModel( info ) {
                 _parent = this,
                 _itemType = ItemType.ITEM_TYPE_FILE,
                 Icon = ICON_FILE,
@@ -91,13 +95,14 @@ namespace TreeViewWithCheckBoxes
             return subItem;
         }
 
-        public FooViewModel( string name, ISimpleFS rootFS )
+        public FooViewModel( SimpleInfoBase info )
         {
             this._fullpath = "";
-            this.Name = name;
+//            this.Name = name;
             this.Children = new List<FooViewModel>();
             this.CbVisibility = "Visible";
-            this._rootFS = rootFS;
+            this._rootFS = info.rootFS;
+            this._fsoInfo = info;
         }
 
         #region Properties
@@ -116,7 +121,8 @@ namespace TreeViewWithCheckBoxes
 
         public bool IsInitiallySelected { get; set; }
 
-        public string Name { get; private set; }
+        public string Name { get { return _fsoInfo.Name; } }
+        public SimpleInfoBase Fso { get { return _fsoInfo; } }
 
         public bool IsExpanded
         {
@@ -139,13 +145,13 @@ namespace TreeViewWithCheckBoxes
 
                         foreach ( KeyValuePair<string, SimpleInfoBase> item in children ) {
                             if ( item.Value.GetType() == typeof( SimpleDirInfo ) ) {
-                                Children.Add( CreateLazyFolderItem( item.Value.Name, item.Value.FullName ) );
+                                Children.Add( CreateLazyFolderItem( item.Value ) );
                             }
                         }
 
                         foreach ( KeyValuePair<string, SimpleInfoBase> item in children ) {
                             if ( item.Value.GetType() == typeof( SimpleFileInfo ) ) {
-                                Children.Add( CreateFileItem( item.Value.Name ) );
+                                Children.Add( CreateFileItem( item.Value ) );
                             }
                         }
 

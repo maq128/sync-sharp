@@ -28,7 +28,7 @@ namespace Sync
 
             FileInfo[] files = dir.GetFiles();
             for ( int i = 0; i < files.Length; i++ ) {
-                SimpleFileInfo file = new SimpleFileInfo();
+                SimpleFileInfo file = new SimpleFileInfo( this );
                 file.Name = files[i].Name;
                 file.FullName = path + "/" + files[i].Name;
                 file.LastWriteTime = files[i].LastWriteTime;
@@ -56,12 +56,13 @@ namespace Sync
             // http://www.pinvoke.net/default.aspx/kernel32.CopyFileEx
         }
 
-        public bool copyFileIn( string destPath, ISimpleFS sourceFS )
+        public bool copyFileIn( SimpleFileInfo source )
         {
-            string destFileName = Path.GetFullPath( this._root + destPath );
+            string destFileName = Path.GetFullPath( this._root + source.FullName );
             string tempFileName = destFileName + ".sync.temp";
             try {
-                sourceFS.copyFileOut( destPath, tempFileName );
+                source.rootFS.copyFileOut( source.FullName, tempFileName );
+                File.SetLastWriteTime( tempFileName, source.LastWriteTime );
                 File.Delete( destFileName );
                 File.Move( tempFileName, destFileName );
             } catch ( Exception ) {

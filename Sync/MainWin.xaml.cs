@@ -145,7 +145,6 @@ namespace Sync
             // 根据节点的选择情况设置操作按钮的使能状态
             connectModelToButtons( rootAonly, new Button[] { btnCopy_a, btnDelete_a } );
             connectModelToButtons( rootAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
-            connectModelToButtons( rootAB, new Button[] { btnDelete_ab } );
             connectModelToButtons( rootBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
             connectModelToButtons( rootBonly, new Button[] { btnCopy_b, btnDelete_b } );
 
@@ -247,11 +246,11 @@ namespace Sync
                 SimpleDirInfo a = item.Value[0];
                 SimpleDirInfo b = item.Value[1];
 
-                FooViewModel subAonly = parentAonly.CreateFolderItem( a.Name );
-                FooViewModel subAnewer = parentAnewer.CreateFolderItem( a.Name );
-                FooViewModel subAB = parentAB.CreateFolderItem( a.Name );
-                FooViewModel subBnewer = parentBnewer.CreateFolderItem( b.Name );
-                FooViewModel subBonly = parentBonly.CreateFolderItem( b.Name );
+                FooViewModel subAonly = parentAonly.CreateFolderItem( a );
+                FooViewModel subAnewer = parentAnewer.CreateFolderItem( a );
+                FooViewModel subAB = parentAB.CreateFolderItem( a );
+                FooViewModel subBnewer = parentBnewer.CreateFolderItem( b );
+                FooViewModel subBonly = parentBonly.CreateFolderItem( b );
 
                 compareTree( a, b, subAonly, subAnewer, subAB, subBnewer, subBonly );
                 if ( subAonly.Children.Count > 0 ) {
@@ -274,13 +273,13 @@ namespace Sync
             // 对仅在 A 中存在的子目录进行遍历
             foreach ( KeyValuePair<string, SimpleDirInfo> item in subDirsA ) {
                 SimpleDirInfo a = item.Value;
-                parentAonly.Children.Add( parentAonly.CreateLazyFolderItem( a.Name, a.FullName ) );
+                parentAonly.Children.Add( parentAonly.CreateLazyFolderItem( a ) );
             }
 
             // 对仅在 B 中存在的子目录进行遍历
             foreach ( KeyValuePair<string, SimpleDirInfo> item in subDirsB ) {
                 SimpleDirInfo b = item.Value;
-                parentBonly.Children.Add( parentBonly.CreateLazyFolderItem( b.Name, b.FullName ) );
+                parentBonly.Children.Add( parentBonly.CreateLazyFolderItem( b ) );
             }
 
             // ---- 比对文件
@@ -309,50 +308,50 @@ namespace Sync
 
                 if ( a.LastWriteTime > b.LastWriteTime.AddSeconds( 5 ) ) {
                     // A > B
-                    parentAnewer.Children.Add( parentAnewer.CreateFileItem( a.Name ) );
+                    parentAnewer.Children.Add( parentAnewer.CreateFileItem( a ) );
                 } else if ( a.LastWriteTime < b.LastWriteTime.AddSeconds( -5 ) ) {
                     // A < B
-                    parentBnewer.Children.Add( parentBnewer.CreateFileItem( a.Name ) );
+                    parentBnewer.Children.Add( parentBnewer.CreateFileItem( a ) );
                 } else {
                     // A = B
-                    parentAB.Children.Add( parentAB.CreateFileItem( a.Name ) );
+                    parentAB.Children.Add( parentAB.CreateFileItem( a ) );
                 }
             }
 
             // 对仅在 A 中存在的文件进行遍历
             foreach ( KeyValuePair<string, SimpleFileInfo> item in subFilesA ) {
                 SimpleFileInfo a = item.Value;
-                parentAonly.Children.Add( parentAonly.CreateFileItem( a.Name ) );
+                parentAonly.Children.Add( parentAonly.CreateFileItem( a ) );
             }
 
             // 对仅在 B 中存在的文件进行遍历
             foreach ( KeyValuePair<string, SimpleFileInfo> item in subFilesB ) {
                 SimpleFileInfo b = item.Value;
-                parentBonly.Children.Add( parentBonly.CreateFileItem( b.Name ) );
+                parentBonly.Children.Add( parentBonly.CreateFileItem( b ) );
             }
         }
 
-        private void doCopy( FooViewModel model, ISimpleFS from, ISimpleFS to )
+        private void doCopy( FooViewModel model, ISimpleFS to )
         {
             // 收集出所有待复制的文件
-            List<string> colls = TreeWalker.walk( model, this, from );
+            List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
             if ( colls == null )
                 return;
 
             // 逐个复制文件
             DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
                 BackgroundWorker _worker = (BackgroundWorker)worker;
-                foreach ( string path in colls ) {
+                foreach ( SimpleFileInfo source in colls ) {
                     if ( _worker.CancellationPending )
                         break;
                     _worker.ReportProgress( 0 );
 
-                    bool ok = to.copyFileIn( path, from );
+                    bool ok = to.copyFileIn( source );
                     if ( !ok ) {
                         // FIXME: 这里辅助线程不能正确显示 UI 对话框
                         MessageBoxResult res = MessageBox.Show(
                             this,
-                            "无法复制以下文件：\r\n  " + path + "\r\n\r\n要继续复制其余的文件吗？\r\n点击“取消”将停止复制。",
+                            "无法复制以下文件：\r\n  " + source.FullName + "\r\n\r\n要继续复制其余的文件吗？\r\n点击“取消”将停止复制。",
                             "操作失败",
                             MessageBoxButton.OKCancel,
                             MessageBoxImage.Error
@@ -370,23 +369,64 @@ namespace Sync
             }
         }
 
-        private void doDelete( FooViewModel model, ISimpleFS from )
+        private void doRCopy( FooViewModel model, ISimpleFS from )
         {
-            List<string> colls = TreeWalker.walk( model, this, from );
+            // 收集出所有待复制的文件
+            List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
             if ( colls == null )
                 return;
 
-             System.Console.WriteLine( "delete from: " + from.ToString() );
-
-            // 逐个删除文件
+            // 逐个复制文件
             DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
                 BackgroundWorker _worker = (BackgroundWorker)worker;
-                foreach ( string path in colls ) {
+                foreach ( SimpleFileInfo dest in colls ) {
                     if ( _worker.CancellationPending )
                         break;
                     _worker.ReportProgress( 0 );
 
-                    System.Console.WriteLine( "    " + path );
+                    // FIXME: 这里的 SimpleFileInfo 对象属性应该是“源文件”的才对（主要是最后修改时间）
+                    SimpleFileInfo source = new SimpleFileInfo( dest );
+                    source.rootFS = from;
+                    bool ok = dest.rootFS.copyFileIn( source );
+                    if ( !ok ) {
+                        // FIXME: 这里辅助线程不能正确显示 UI 对话框
+                        MessageBoxResult res = MessageBox.Show(
+                            this,
+                            "无法复制以下文件：\r\n  " + source.FullName + "\r\n\r\n要继续复制其余的文件吗？\r\n点击“取消”将停止复制。",
+                            "操作失败",
+                            MessageBoxButton.OKCancel,
+                            MessageBoxImage.Error
+                        );
+                        if ( res != MessageBoxResult.OK )
+                            break;
+                    }
+                }
+                ev.Cancel = _worker.CancellationPending;
+            };
+
+            ProcessDlg dlg = new ProcessDlg( fnWorking, this );
+            bool? finished = dlg.ShowDialog();
+            if ( finished.HasValue && (bool)finished ) {
+            }
+        }
+
+        private void doDelete( FooViewModel model )
+        {
+            List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
+            if ( colls == null )
+                return;
+
+             System.Console.WriteLine( "delete from: " + model.Fso.rootFS.ToString() );
+
+            // 逐个删除文件
+            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
+                BackgroundWorker _worker = (BackgroundWorker)worker;
+                foreach ( SimpleFileInfo source in colls ) {
+                    if ( _worker.CancellationPending )
+                        break;
+                    _worker.ReportProgress( 0 );
+
+                    System.Console.WriteLine( "    " + source.FullName );
                 }
                 ev.Cancel = _worker.CancellationPending;
             };
@@ -400,66 +440,59 @@ namespace Sync
         private void btnCopy_a_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeAonly.DataContext ).First<FooViewModel>();
-            doCopy( model, aFS, bFS );
+            doCopy( model, bFS );
         }
 
         private void btnDelete_a_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeAonly.DataContext ).First<FooViewModel>();
-            doDelete( model, aFS );
+            doDelete( model );
         }
 
         private void btnCopy_an_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeAnewer.DataContext ).First<FooViewModel>();
-            doCopy( model, aFS, bFS );
+            doCopy( model, bFS );
         }
 
         private void btnRCopy_an_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeAnewer.DataContext ).First<FooViewModel>();
-            doCopy( model, bFS, aFS );
-        }
-
-        private void btnDelete_ab_Click( object sender, RoutedEventArgs e )
-        {
-            FooViewModel model = ( (List<FooViewModel>)treeAB.DataContext ).First<FooViewModel>();
-            doDelete( model, aFS );
-            doDelete( model, bFS );
+            doRCopy( model, bFS );
         }
 
         private void btnCopy_bn_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeBnewer.DataContext ).First<FooViewModel>();
-            doCopy( model, bFS, aFS );
+            doCopy( model, aFS );
         }
 
         private void btnRCopy_bn_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeBnewer.DataContext ).First<FooViewModel>();
-            doCopy( model, aFS, bFS );
+            doRCopy( model, aFS );
         }
 
         private void btnCopy_b_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeBonly.DataContext ).First<FooViewModel>();
-            doCopy( model, bFS, aFS );
+            doCopy( model, aFS );
         }
 
         private void btnDelete_b_Click( object sender, RoutedEventArgs e )
         {
             FooViewModel model = ( (List<FooViewModel>)treeBonly.DataContext ).First<FooViewModel>();
-            doDelete( model, bFS );
+            doDelete( model );
         }
     }
 
-    // 遍历一个 model 以收集其全部选中的项目（子目录、文件）
+    // 遍历一个 model 以收集其全部选中的项目（只有文件，不包含目录）
     public class TreeWalker
     {
-        static public List<string> walk( FooViewModel vroot, Window owner, ISimpleFS fs )
+        static public List<SimpleFileInfo> walk( FooViewModel vroot, Window owner )
         {
-            TreeWalker walker = new TreeWalker( fs );
-            walker._colls = new List<string>();
+            TreeWalker walker = new TreeWalker();
+            walker._colls = new List<SimpleFileInfo>();
             DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
                 walker._worker = (BackgroundWorker)worker;
                 try {
@@ -485,13 +518,11 @@ namespace Sync
         }
 
         BackgroundWorker _worker;
-        List<string> _colls;
-        ISimpleFS _fs;
+        List<SimpleFileInfo> _colls;
 
-        private TreeWalker( ISimpleFS fs )
+        private TreeWalker()
         {
-            _colls = new List<string>();
-            _fs = fs;
+            _colls = new List<SimpleFileInfo>();
         }
 
         private void walkModelRecur( FooViewModel model, string path )
@@ -506,7 +537,7 @@ namespace Sync
             if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FOLDER ) {
                 if ( model.Fullpath.Length > 0 ) {
                     // 尚未展开的子目录，用 FS 继续递归遍历
-                    walkFsRecur( path + model.Name + "/" );
+                    walkFsRecur( path + model.Name + "/", model.Fso.rootFS );
                 } else {
                     // 已经展开的子目录
                     foreach ( FooViewModel sub in model.Children ) {
@@ -515,26 +546,26 @@ namespace Sync
                 }
             } else if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FILE ) {
                 // 文件
-                _colls.Add( path + model.Name );
+                _colls.Add( (SimpleFileInfo)model.Fso );
             }
         }
 
-        private void walkFsRecur( string path )
+        private void walkFsRecur( string path, ISimpleFS fs )
         {
             if ( _worker.CancellationPending ) {
                 throw new System.Exception( "取消了操作" );
             }
             _worker.ReportProgress( 0 );
 
-            foreach ( KeyValuePair<string, SimpleInfoBase> item in _fs.getChildren( path ) ) {
+            foreach ( KeyValuePair<string, SimpleInfoBase> item in fs.getChildren( path ) ) {
                 string name = item.Key;
                 SimpleInfoBase value = item.Value;
                 if ( value.GetType() == typeof( SimpleDirInfo ) ) {
                     // 子目录
-                    walkFsRecur( path + name + "/" );
+                    walkFsRecur( path + name + "/", fs );
                 } else {
                     // 文件
-                    _colls.Add( path + name );
+                    _colls.Add( (SimpleFileInfo)value );
                 }
             }
         }

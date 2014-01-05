@@ -1,8 +1,9 @@
-using System.IO;
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
 using WebDav.Client;
 using WebDav.Client.Exceptions;
-using System.Net;
 
 namespace Sync
 {
@@ -18,6 +19,9 @@ namespace Sync
                 this._root += "/";
             }
             this._session = new WebDavSession();
+
+            ServicePoint sp = ServicePointManager.FindServicePoint( new Uri( this._root ) );
+            sp.Expect100Continue = false;
         }
 
         public void setAuth( string username, string password )
@@ -67,7 +71,7 @@ namespace Sync
                     subdir.FullName = path + "/" + name;
                     result.Add( subdir.Name, subdir );
                 } else if ( item.ItemType == ItemType.Resource ) {
-                    SimpleFileInfo file = new SimpleFileInfo();
+                    SimpleFileInfo file = new SimpleFileInfo( this );
                     file.Name = name;
                     file.FullName = path + "/" + name;
                     file.LastWriteTime = item.LastModified;
@@ -98,8 +102,33 @@ namespace Sync
             file.Download( realpath );
         }
 
-        public bool copyFileIn( string destPath, ISimpleFS sourceFS )
+        public bool copyFileIn( SimpleFileInfo source )
         {
+            string destUrl = this._root;
+            if ( source.FullName.StartsWith( "/" ) ) {
+                destUrl += source.FullName.Substring( 1 );
+            } else {
+                destUrl += source.FullName;
+            }
+            string tempUrl = destUrl + ".sync.temp";
+            string tempFileName = Path.GetTempFileName();
+            try {
+                source.rootFS.copyFileOut( source.FullName, tempFileName );
+
+                //string folderUrl = tempUrl.Substring( 0, tempUrl.LastIndexOf( "/" ) + 1 );
+                //string fileName = tempUrl.Substring( tempUrl.LastIndexOf( "/" ) + 1 );
+                //IFolder folder = _session.OpenFolder( folderUrl );
+                //IResource file = folder.CreateResource( fileName );
+
+                WebDavResource file = new WebDavResource();
+                file.SetHref( new Uri( tempUrl ) );
+                file.SetCredentials( this._session.Credentials );
+                file.Upload( tempFileName );
+            } catch ( Exception e ) {
+                File.Delete( tempFileName );
+                return false;
+            }
+            File.Delete( tempFileName );
             return true;
         }
 
