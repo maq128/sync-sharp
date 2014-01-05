@@ -18,6 +18,7 @@ using System.ComponentModel;
 using System.Threading;
 
 using System.Collections;
+using System.Net;
 
 namespace Sync
 {
@@ -65,7 +66,7 @@ namespace Sync
                         // 验证是否具有访问权限
                         fs.getChildren( "" );
                         break;
-                    } catch ( WebDav.Client.Exceptions.UnauthorizedException ) {
+                    } catch ( Sync.UnauthorizedException ) {
                         // 从配置文件中取出身份信息
                         string username = "";
                         string password = "";
