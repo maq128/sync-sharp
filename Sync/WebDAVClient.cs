@@ -214,6 +214,31 @@ namespace Sync
             }
             return list;
         }
+
+        public void Download(String remoteFilePath, String localFilePath)
+        {
+            // Should not have a trailing slash.
+            remoteFilePath = remoteFilePath.Trim( '/' );
+            Uri downloadUri = new Uri( this.server + remoteFilePath );
+            string method = WebRequestMethods.Http.Get.ToString();
+
+            using ( HttpWebResponse response = (HttpWebResponse)HTTPRequest( downloadUri, method, null, null, null ) ) {
+                int statusCode = (int)response.StatusCode;
+                int contentLength = int.Parse( response.GetResponseHeader( "Content-Length" ) );
+
+                using ( Stream stream = response.GetResponseStream() ) {
+                    using ( FileStream fs = new FileStream( localFilePath, FileMode.Create, FileAccess.Write ) ) {
+                        byte[] content = new byte[4096];
+                        int bytesRead = 0;
+                        do {
+                            bytesRead = stream.Read( content, 0, content.Length );
+                            fs.Write( content, 0, bytesRead );
+                        } while ( bytesRead > 0 );
+                    }
+                }
+            }
+        }
+
         #endregion
 
         #region Server communication
