@@ -23,7 +23,7 @@ namespace Sync
     /// </summary>
     public partial class ProcessDlg : Window
     {
-        BackgroundWorker _worker;
+        static public BackgroundWorker _worker;
         bool _isShown;
 
         public ProcessDlg( DoWorkEventHandler fnWorking, Window owner )
@@ -43,9 +43,17 @@ namespace Sync
             int per = (int)progressBar1.Minimum;
             _worker.ProgressChanged += ( sender, e ) => {
                 // 这段代码将在主线程中执行
-                progressBar1.Value = per++; // e.ProgressPercentage;
-                if ( per > (int)progressBar1.Maximum ) {
-                    per = (int)progressBar1.Minimum;
+                int value = per + 1;
+                if ( e.ProgressPercentage > 0 ) {
+                    value = (int)( progressBar1.Minimum + ( progressBar1.Maximum - progressBar1.Minimum ) * e.ProgressPercentage / 100 );
+                }
+                progressBar1.Value = value;
+                per = (int)progressBar1.Value;
+
+                if ( e.UserState != null ) {
+                    this.Title = e.UserState.ToString();
+                } else {
+                    this.Title = "正在处理……";
                 }
             };
 

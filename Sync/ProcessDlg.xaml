@@ -3,10 +3,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="正在处理……"
     Height="104"
-    Width="300"
+    Width="479"
     WindowStartupLocation="CenterOwner" Loaded="Window_Loaded" Closed="Window_Closed">
     <Grid>
         <ProgressBar Height="10" Margin="12,12,12,0" Name="progressBar1" VerticalAlignment="Top" Orientation="Horizontal" Value="0" />
-        <Button Height="23" Margin="104,0,99,12" Name="btn" VerticalAlignment="Bottom" Click="btn_Click">停止</Button>
+        <Button Margin="202,31,209,12" Name="btn" Click="btn_Click">停止</Button>
     </Grid>
 </Window>

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -53,6 +54,7 @@ namespace Sync
 
         Config _config;
         BackgroundWorker _worker;
+        int _scanCount;
 
         ISimpleFS aFS;
         ISimpleFS bFS;
@@ -156,8 +158,9 @@ namespace Sync
                 // 这段代码将在辅助线程中执行
                 _worker = (BackgroundWorker)worker;
                 try {
+                    this._scanCount = 0;
                     compareTree( dirA, dirB, rootAonly, rootAnewer, rootAB, rootBnewer, rootBonly );
-                } catch ( System.Exception ex ) {
+                } catch ( Exception ex ) {
                     // 如果不是因为主动要求中止，则向外抛错
                     if ( ! _worker.CancellationPending ) {
                         throw ex;
@@ -188,9 +191,9 @@ namespace Sync
         private void compareTree( SimpleDirInfo dirA, SimpleDirInfo dirB, FooViewModel parentAonly, FooViewModel parentAnewer, FooViewModel parentAB, FooViewModel parentBnewer, FooViewModel parentBonly )
         {
             if ( _worker.CancellationPending ) {
-                throw new System.Exception( "取消了操作" );
+                throw new Exception( "取消了操作" );
             }
-            _worker.ReportProgress( 1 );
+            _worker.ReportProgress( 0, String.Format("扫描文件夹: {0}", ++this._scanCount) );
 
             // 读取 A、B 的所有子项
             SortedList<string, SimpleInfoBase> aChildren = dirA.getChildren();
@@ -417,7 +420,7 @@ namespace Sync
             if ( colls == null )
                 return;
 
-             System.Console.WriteLine( "delete from: " + model.Fso.rootFS.ToString() );
+             Console.WriteLine( "delete from: " + model.Fso.rootFS.ToString() );
 
             // 逐个删除文件
             DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
@@ -427,7 +430,7 @@ namespace Sync
                         break;
                     _worker.ReportProgress( 0 );
 
-                    System.Console.WriteLine( "    " + source.FullName );
+                    Console.WriteLine( "    " + source.FullName );
                 }
                 ev.Cancel = _worker.CancellationPending;
             };
@@ -500,7 +503,7 @@ namespace Sync
                     foreach ( FooViewModel sub in vroot.Children ) {
                         walker.walkModelRecur( sub, "/" );
                     }
-                } catch ( System.Exception ex ) {
+                } catch ( Exception ex ) {
                     // 如果不是因为主动要求中止，则向外抛错
                     if ( !walker._worker.CancellationPending ) {
                         throw ex;
@@ -554,7 +557,7 @@ namespace Sync
         private void walkFsRecur( string path, ISimpleFS fs )
         {
             if ( _worker.CancellationPending ) {
-                throw new System.Exception( "取消了操作" );
+                throw new Exception( "取消了操作" );
             }
             _worker.ReportProgress( 0 );
 

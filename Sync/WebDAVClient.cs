@@ -76,28 +76,6 @@ namespace Sync
             get { return domain; }
             set { domain = value; }
         }
-
-        Uri getServerUrl( String path, Boolean appendTrailingSlash )
-        {
-            //String completePath = basePath;
-            //if ( path != null ) {
-            //    completePath += path.Trim( '/' );
-            //}
-
-            //if ( appendTrailingSlash && completePath.EndsWith( "/" ) == false ) { completePath += '/'; }
-
-            //if ( port.HasValue ) {
-            //    return new Uri( server + ":" + port + completePath );
-            //} else {
-            //    return new Uri( server + completePath );
-            //}
-
-            string completePath = this.server + path.TrimStart( '/' );
-            if ( appendTrailingSlash ) {
-                completePath = completePath.TrimEnd( '/' ) + "/";
-            }
-            return new Uri( completePath );
-        }
         #endregion
 
         public class Res
@@ -137,9 +115,10 @@ namespace Sync
             StringBuilder propfind = new StringBuilder();
             propfind.Append( "<?xml version=\"1.0\" encoding=\"utf-8\" ?>" );
             propfind.Append( "<propfind xmlns=\"DAV:\">" );
-            propfind.Append( "  <prop>" );
+            propfind.Append( "  <prop xmlns:f=\"http://maq128.vicp.cc/ns\">" );
             propfind.Append( "    <getcontentlength/>" );
             propfind.Append( "    <getlastmodified/>" );
+            propfind.Append( "    <f:mymodifiedtime/>" );
             propfind.Append( "  </prop>" );
             propfind.Append( "</propfind>" );
 
@@ -185,6 +164,7 @@ namespace Sync
                     xml.Load( stream );
                     XmlNamespaceManager xmlNsManager = new XmlNamespaceManager( xml.NameTable );
                     xmlNsManager.AddNamespace( "d", "DAV:" );
+                    xmlNsManager.AddNamespace( "f", "http://maq128.vicp.cc/ns" );
 
                     foreach ( XmlNode node in xml.DocumentElement.ChildNodes ) {
                         XmlNode xmlNode = node.SelectSingleNode( "d:href", xmlNsManager );
@@ -204,8 +184,12 @@ namespace Sync
                                 // 这是一个 file
                                 ResFile res = new ResFile();
                                 res.Name = name;
-                                res.LastWriteTime = DateTime.Parse( node.SelectSingleNode( "descendant::d:getlastmodified", xmlNsManager ).InnerText );
                                 res.Length = Int32.Parse( node.SelectSingleNode( "descendant::d:getcontentlength", xmlNsManager ).InnerText );
+                                try {
+                                    res.LastWriteTime = DateTime.Parse( node.SelectSingleNode( "descendant::f:mymodifiedtime", xmlNsManager ).InnerText );
+                                } catch ( Exception ) {
+                                    res.LastWriteTime = DateTime.Parse( node.SelectSingleNode( "descendant::d:getlastmodified", xmlNsManager ).InnerText );
+                                }
                                 list.Add( res );
                             }
                         }
@@ -225,6 +209,7 @@ namespace Sync
             using ( HttpWebResponse response = (HttpWebResponse)HTTPRequest( downloadUri, method, null, null, null ) ) {
                 int statusCode = (int)response.StatusCode;
                 int contentLength = int.Parse( response.GetResponseHeader( "Content-Length" ) );
+                int doneLength = 0;
 
                 using ( Stream stream = response.GetResponseStream() ) {
                     using ( FileStream fs = new FileStream( localFilePath, FileMode.Create, FileAccess.Write ) ) {
@@ -232,6 +217,9 @@ namespace Sync
                         int bytesRead = 0;
                         do {
                             bytesRead = stream.Read( content, 0, content.Length );
+                            doneLength += bytesRead;
+                            ProcessDlg._worker.ReportProgress( (int)doneLength * 100 / contentLength, String.Format( "[{0:N0}] {1}", contentLength, remoteFilePath ) );
+
                             fs.Write( content, 0, bytesRead );
                         } while ( bytesRead > 0 );
                     }
@@ -239,6 +227,37 @@ namespace Sync
             }
         }
 
+        public void Upload( String remoteFilePath, String localFilePath )
+        {
+            // Should not have a trailing slash.
+            remoteFilePath = remoteFilePath.Trim( '/' );
+            Uri uploadUri = new Uri( this.server + remoteFilePath );
+            string method = WebRequestMethods.Http.Put.ToString();
+
+            using ( HttpWebResponse response = (HttpWebResponse)HTTPRequest( uploadUri, method, null, null, localFilePath ) ) {
+                int statusCode = (int)response.StatusCode;
+            }
+        }
+
+        public void SetLastWriteTime( String remoteFilePath, DateTime time )
+        {
+            // Should not have a trailing slash.
+            remoteFilePath = remoteFilePath.Trim( '/' );
+            Uri updateUri = new Uri( this.server + remoteFilePath );
+
+            StringBuilder proppatch = new StringBuilder();
+            proppatch.Append( "<?xml version=\"1.0\" encoding=\"utf-8\" ?>" );
+            proppatch.Append( "<propertyupdate xmlns=\"DAV:\" xmlns:f=\"http://maq128.vicp.cc/ns\">" );
+            proppatch.Append( "  <set>" );
+            proppatch.Append( "    <prop>" );
+            proppatch.Append( "      <f:mymodifiedtime>" + time.ToUniversalTime().ToString( "R" ) + "</f:mymodifiedtime>" );
+            proppatch.Append( "    </prop>" );
+            proppatch.Append( "  </set>" );
+            proppatch.Append( "</propertyupdate>" );
+
+            using ( WebResponse response = HTTPRequest( updateUri, "PROPPATCH", null, Encoding.UTF8.GetBytes( proppatch.ToString() ), null ) ) {
+            }
+        }
         #endregion
 
         #region Server communication
@@ -294,12 +313,22 @@ namespace Sync
                     // The request either contains actual content...
                     httpWebRequest.ContentLength = content.Length;
                     httpWebRequest.ContentType = "text/xml";
-                    Stream s = httpWebRequest.GetRequestStream();
-                    s.Write( content, 0, content.Length );
+                    using ( Stream s = httpWebRequest.GetRequestStream() ) {
+                        s.Write( content, 0, content.Length );
+                    }
                 } else {
                     // ...or a reference to the file to be added as content.
-                    //httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
-                    //asyncState.uploadFilePath = uploadFilePath;
+                    httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
+                    using ( Stream s = httpWebRequest.GetRequestStream() ) {
+                        using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
+                            byte[] buf = new byte[4096];
+                            int bytesRead = 0;
+                            do {
+                                bytesRead = fs.Read( buf, 0, buf.Length );
+                                s.Write( buf, 0, bytesRead );
+                            } while ( bytesRead > 0 );
+                        }
+                    }
                 }
             }
 
@@ -336,8 +365,17 @@ namespace Sync
                         s.Write( content, 0, content.Length );
                     } else {
                         // ...or a reference to the file to be added as content.
-                        //httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
-                        //asyncState.uploadFilePath = uploadFilePath;
+                        httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
+                        using ( Stream s = httpWebRequest.GetRequestStream() ) {
+                            using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
+                                byte[] buf = new byte[4096];
+                                int bytesRead = 0;
+                                do {
+                                    bytesRead = fs.Read( buf, 0, buf.Length );
+                                    s.Write( buf, 0, bytesRead );
+                                } while ( bytesRead > 0 );
+                            }
+                        }
                     }
                 }
 

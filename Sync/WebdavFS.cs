@@ -73,48 +73,39 @@ namespace Sync
             return result;
         }
 
+        private void createDirIfNecessary( string dir )
+        {
+            if ( Directory.Exists( dir ) )
+                return;
+            createDirIfNecessary( Path.GetDirectoryName( dir ) );
+            Directory.CreateDirectory( dir );
+        }
+
         public void copyFileOut( string sourcePath, string realpath )
         {
-            //string url = this._root;
-            //if ( sourcePath.StartsWith( "/" ) ) {
-            //    url += sourcePath.Substring( 1 );
-            //} else {
-            //    url += sourcePath;
-            //}
-            //WebDavSession sess = new WebDavSession();
-            //sess.Credentials = this._session.Credentials;
-            //IResource file = sess.OpenResource( url );
-            //file.Download( realpath );
-            this._client.Download(sourcePath, realpath);
+            string destFileName = realpath;
+            createDirIfNecessary( Path.GetDirectoryName( destFileName ) );
+            this._client.Download( sourcePath, realpath );
         }
 
         public bool copyFileIn( SimpleFileInfo source )
         {
-            //string destUrl = this._root;
-            //if ( source.FullName.StartsWith( "/" ) ) {
-            //    destUrl += source.FullName.Substring( 1 );
-            //} else {
-            //    destUrl += source.FullName;
-            //}
-            //string tempUrl = destUrl + ".sync.temp";
-            //string tempFileName = Path.GetTempFileName();
-            //try {
-            //    source.rootFS.copyFileOut( source.FullName, tempFileName );
+            string tempDest = source.FullName + ".sync.temp";
+            string tempFileName = Path.GetTempFileName();
+            try {
+                source.rootFS.copyFileOut( source.FullName, tempFileName );
+                this._client.Upload( tempDest, tempFileName );
 
-            //    //string folderUrl = tempUrl.Substring( 0, tempUrl.LastIndexOf( "/" ) + 1 );
-            //    //string fileName = tempUrl.Substring( tempUrl.LastIndexOf( "/" ) + 1 );
-            //    //IFolder folder = _session.OpenFolder( folderUrl );
-            //    //IResource file = folder.CreateResource( fileName );
+                // 设置时间
+                this._client.SetLastWriteTime( tempDest, DateTime.Parse( "Mon, 12 Jan 1998 09:00:00 GMT" ) );
 
-            //    WebDavResource file = new WebDavResource();
-            //    file.SetHref( new Uri( tempUrl ) );
-            //    file.SetCredentials( this._session.Credentials );
-            //    file.Upload( tempFileName );
-            //} catch ( Exception e ) {
-            //    File.Delete( tempFileName );
-            //    return false;
-            //}
-            //File.Delete( tempFileName );
+                // 删除旧文件, 新文件改名
+
+            } catch ( Exception ) {
+                File.Delete( tempFileName );
+                return false;
+            }
+            File.Delete( tempFileName );
             return true;
         }
 
