@@ -38,22 +38,18 @@ namespace Sync
             return result;
         }
 
-        private void createDirIfNecessary( string dir )
+        public string getFileCopy( string sourcePath, string realpath, bool bForce )
         {
-            if ( Directory.Exists( dir ) )
-                return;
-            createDirIfNecessary( Path.GetDirectoryName( dir ) );
-            Directory.CreateDirectory( dir );
-        }
-
-        public void copyFileOut( string sourcePath, string realpath )
-        {
-            string sourceFileName = this._root + sourcePath;
-            string destFileName = realpath;
-            createDirIfNecessary( Path.GetDirectoryName( destFileName ) );
-            File.Copy( sourceFileName, destFileName, true );
-            // 参考资料
-            // http://www.pinvoke.net/default.aspx/kernel32.CopyFileEx
+            if ( bForce ) {
+                string sourceFileName = this._root + sourcePath;
+                string destFileName = realpath;
+                Directory.CreateDirectory( Path.GetDirectoryName( destFileName ) );
+                // 参考资料
+                // http://www.pinvoke.net/default.aspx/kernel32.CopyFileEx
+                File.Copy( sourceFileName, destFileName, true );
+                return realpath;
+            }
+            return this._root + sourcePath;
         }
 
         public bool copyFileIn( SimpleFileInfo source )
@@ -61,12 +57,23 @@ namespace Sync
             string destFileName = Path.GetFullPath( this._root + source.FullName );
             string tempFileName = destFileName + ".sync.temp";
             try {
-                source.rootFS.copyFileOut( source.FullName, tempFileName );
+                source.rootFS.getFileCopy( source.FullName, tempFileName, true );
                 File.SetLastWriteTime( tempFileName, source.LastWriteTime );
                 File.Delete( destFileName );
                 File.Move( tempFileName, destFileName );
             } catch ( Exception ) {
                 File.Delete( tempFileName );
+                return false;
+            }
+            return true;
+        }
+
+        public bool del( string path )
+        {
+            try {
+                Console.WriteLine( "delete: " + this._root + path );
+                File.Delete( this._root + path );
+            } catch ( Exception ) {
                 return false;
             }
             return true;

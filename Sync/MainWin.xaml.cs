@@ -420,7 +420,7 @@ namespace Sync
             if ( colls == null )
                 return;
 
-             Console.WriteLine( "delete from: " + model.Fso.rootFS.ToString() );
+            // TODO: 删除空文件夹
 
             // 逐个删除文件
             DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
@@ -430,7 +430,7 @@ namespace Sync
                         break;
                     _worker.ReportProgress( 0 );
 
-                    Console.WriteLine( "    " + source.FullName );
+                    source.rootFS.del( source.FullName );
                 }
                 ev.Cancel = _worker.CancellationPending;
             };

@@ -11,6 +11,10 @@ namespace Sync
     {
     }
 
+    /*
+        WebDAV 规范文本 RFC4918
+        http://webdav.org/specs/rfc4918.html
+    */
     public class WebDAVClient
     {
         #region WebDAV connection parameters
@@ -31,27 +35,6 @@ namespace Sync
         }
         private String basePath = "/";
 
-        ///// <summary>
-        ///// Specify the path of a WebDAV directory to use as 'root' (default: /)
-        ///// </summary>
-        //public String BasePath
-        //{
-        //    get { return basePath; }
-        //    set
-        //    {
-        //        value = value.Trim( '/' );
-        //        basePath = "/" + value + "/";
-        //    }
-        //}
-        //private int? port = null;
-        ///// <summary>
-        ///// Specify an port (default: null = auto-detect)
-        ///// </summary>
-        //public int? Port
-        //{
-        //    get { return port; }
-        //    set { port = value; }
-        //}
         private String user;
         /// <summary>
         /// Specify a username (optional)
@@ -168,7 +151,7 @@ namespace Sync
 
                     foreach ( XmlNode node in xml.DocumentElement.ChildNodes ) {
                         XmlNode xmlNode = node.SelectSingleNode( "d:href", xmlNsManager );
-                        string filepath = Uri.UnescapeDataString( xmlNode.InnerXml );
+                        string filepath = Uri.UnescapeDataString( xmlNode.InnerText );
                         string[] file = filepath.Split( new string[1] { prefix }, 2, StringSplitOptions.RemoveEmptyEntries );
                         if ( file.Length > 0 ) {
                             // Want to see directory contents, not the directory itself.
@@ -201,7 +184,6 @@ namespace Sync
 
         public void Download(String remoteFilePath, String localFilePath)
         {
-            // Should not have a trailing slash.
             remoteFilePath = remoteFilePath.Trim( '/' );
             Uri downloadUri = new Uri( this.server + remoteFilePath );
             string method = WebRequestMethods.Http.Get.ToString();
@@ -229,7 +211,6 @@ namespace Sync
 
         public void Upload( String remoteFilePath, String localFilePath )
         {
-            // Should not have a trailing slash.
             remoteFilePath = remoteFilePath.Trim( '/' );
             Uri uploadUri = new Uri( this.server + remoteFilePath );
             string method = WebRequestMethods.Http.Put.ToString();
@@ -241,7 +222,6 @@ namespace Sync
 
         public void SetLastWriteTime( String remoteFilePath, DateTime time )
         {
-            // Should not have a trailing slash.
             remoteFilePath = remoteFilePath.Trim( '/' );
             Uri updateUri = new Uri( this.server + remoteFilePath );
 
@@ -256,6 +236,41 @@ namespace Sync
             proppatch.Append( "</propertyupdate>" );
 
             using ( WebResponse response = HTTPRequest( updateUri, "PROPPATCH", null, Encoding.UTF8.GetBytes( proppatch.ToString() ), null ) ) {
+            }
+        }
+
+        public void Delete( String remoteFilePath )
+        {
+            remoteFilePath = remoteFilePath.Trim( '/' );
+            Uri deleteUri = new Uri( this.server + remoteFilePath );
+
+            using ( WebResponse response = HTTPRequest( deleteUri, "DELETE", null, null, null ) ) {
+            }
+        }
+
+        public void RenameTo( String remoteFilePath, String remoteFilePathTo )
+        {
+            remoteFilePath = remoteFilePath.Trim( '/' );
+            remoteFilePathTo = remoteFilePathTo.Trim( '/' );
+            Uri fromUri = new Uri( this.server + remoteFilePath );
+            Uri toUri = new Uri( this.server + remoteFilePathTo );
+
+            IDictionary<string, string> headers = new Dictionary<string, string>();
+            headers.Add( "Destination", toUri.AbsoluteUri );
+
+            using ( WebResponse response = HTTPRequest( fromUri, "MOVE", headers, null, null ) ) {
+            }
+        }
+
+        public void CreateDir( string remotePath )
+        {
+            remotePath = remotePath.Trim( '/' ) + "/";
+            if ( remotePath == "/" ) remotePath = "";
+            Uri createUri = new Uri( this.server + remotePath );
+
+            string method = WebRequestMethods.Http.MkCol.ToString();
+
+            using ( WebResponse response = HTTPRequest( createUri, method, null, null, null ) ) {
             }
         }
         #endregion

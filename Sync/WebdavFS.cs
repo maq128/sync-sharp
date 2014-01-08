@@ -73,39 +73,75 @@ namespace Sync
             return result;
         }
 
-        private void createDirIfNecessary( string dir )
+        public string getFileCopy( string sourcePath, string realpath, bool bForce )
         {
-            if ( Directory.Exists( dir ) )
-                return;
-            createDirIfNecessary( Path.GetDirectoryName( dir ) );
-            Directory.CreateDirectory( dir );
-        }
-
-        public void copyFileOut( string sourcePath, string realpath )
-        {
-            string destFileName = realpath;
-            createDirIfNecessary( Path.GetDirectoryName( destFileName ) );
+            Directory.CreateDirectory( Path.GetDirectoryName( realpath ) );
             this._client.Download( sourcePath, realpath );
+            return realpath;
         }
 
         public bool copyFileIn( SimpleFileInfo source )
         {
-            string tempDest = source.FullName + ".sync.temp";
             string tempFileName = Path.GetTempFileName();
             try {
-                source.rootFS.copyFileOut( source.FullName, tempFileName );
-                this._client.Upload( tempDest, tempFileName );
+                // 上传到一个临时文件
+                string tempDest = source.FullName + ".sync.temp";
+
+                // 创建所需的目录
+                createDirIfNecessary( getDirectoryName( tempDest ) );
+
+                // 上传
+                string fileCopy = source.rootFS.getFileCopy( source.FullName, tempFileName, false );
+                this._client.Upload( tempDest, fileCopy );
 
                 // 设置时间
-                this._client.SetLastWriteTime( tempDest, DateTime.Parse( "Mon, 12 Jan 1998 09:00:00 GMT" ) );
+                this._client.SetLastWriteTime( tempDest, source.LastWriteTime );
 
-                // 删除旧文件, 新文件改名
+                // 临时文件改名覆盖目标文件
+                this._client.RenameTo( tempDest, source.FullName );
 
             } catch ( Exception ) {
                 File.Delete( tempFileName );
                 return false;
             }
             File.Delete( tempFileName );
+            return true;
+        }
+
+        private string getDirectoryName( string remotePath )
+        {
+            remotePath = remotePath.Trim( '/' );
+            int pos = remotePath.LastIndexOf( '/' );
+            if ( pos < 0 )
+                return "";
+            return remotePath.Substring( 0, pos + 1 );
+        }
+
+        List<string> _exist_dirs = new List<string>();
+        private void createDirIfNecessary( string remotePath )
+        {
+            string[] segs = remotePath.Split( new char[1] { '/' }, StringSplitOptions.RemoveEmptyEntries );
+            string dir = "";
+            foreach ( string seg in segs ) {
+                dir += seg + "/";
+                if ( _exist_dirs.Contains( dir ) )
+                    continue;
+                try {
+                    this._client.CreateDir( dir );
+                } catch ( Exception ) {
+                }
+                _exist_dirs.Add( dir );
+            }
+        }
+
+        public bool del( string path )
+        {
+            try {
+                Console.WriteLine( "delete: " + this._root + path );
+                this._client.Delete( path );
+            } catch ( Exception ) {
+                return false;
+            }
             return true;
         }
 

@@ -102,15 +102,25 @@ namespace Sync
 
         /// <summary>
         /// 把 sourcePath 指定的文件复制到 realpath 指定的位置。
-        /// sourcePath 为本 FS 内部的绝对路径。
-        /// realpath 为本地硬盘的绝对路径。
         /// </summary>
-        void copyFileOut( string sourcePath, string realpath );
+        /// <param name="sourcePath">为本 FS 内部的绝对路径。</param>
+        /// <param name="realpath">为本地硬盘的绝对路径。</param>
+        /// <param name="bForce">表示是否强制复制文件到 realpath。当 bForce 为 false 时，实现类可以
+        /// 根据自身情况决定是复制文件到 realpath 还是直接返回源文件。</param>
+        /// <returns>复制文件的本地硬盘绝对路径，如果实际复制到 realpath 指定文件的话，则返回 realpath。</returns>
+        string getFileCopy( string sourcePath, string realpath, bool bForce );
 
         /// <summary>
         /// 把 source 指定的文件从其所在的 FS 复制到本 FS。
-        /// source 为源文件。
         /// </summary>
+        /// <param name="source">为源文件。</param>
         bool copyFileIn( SimpleFileInfo source );
+
+        /// <summary>
+        /// 删除指定的文件或者目录。
+        /// 如果指定的是目录，则只有在该目录为空的时候才会删除。
+        /// </summary>
+        /// <param name="path">指定的文件或者目录。</param>
+        bool del( string path );
     }
 }
