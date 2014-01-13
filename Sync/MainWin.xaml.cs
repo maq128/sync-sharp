@@ -315,7 +315,7 @@ namespace Sync
                     parentAnewer.Children.Add( parentAnewer.CreateFileItem( a ) );
                 } else if ( a.LastWriteTime < b.LastWriteTime.AddSeconds( -5 ) ) {
                     // A < B
-                    parentBnewer.Children.Add( parentBnewer.CreateFileItem( a ) );
+                    parentBnewer.Children.Add( parentBnewer.CreateFileItem( b ) );
                 } else {
                     // A = B
                     parentAB.Children.Add( parentAB.CreateFileItem( a ) );
