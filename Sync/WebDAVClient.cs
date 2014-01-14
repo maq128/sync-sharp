@@ -333,7 +333,12 @@ namespace Sync
                     }
                 } else {
                     // ...or a reference to the file to be added as content.
-                    httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
+                    httpWebRequest.SendChunked = true;
+                    //httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
+
+                    // FIXME: 此处应该改为异步方式，就可以不受超时的限制了
+                    httpWebRequest.Timeout = 500000;
+
                     using ( Stream s = httpWebRequest.GetRequestStream() ) {
                         using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
                             byte[] buf = new byte[4096];

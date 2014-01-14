@@ -337,6 +337,10 @@ namespace Sync
 
         private void doCopy( FooViewModel model, ISimpleFS to )
         {
+            //ModelWalker walker = new ModelWalker( model, this );
+            //walker.walk();
+            //return;
+
             // 收集出所有待复制的文件
             List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
             if ( colls == null )
@@ -487,6 +491,36 @@ namespace Sync
         {
             FooViewModel model = ( (List<FooViewModel>)treeBonly.DataContext ).First<FooViewModel>();
             doDelete( model );
+        }
+    }
+
+    // 遍历一个 model 中选中的项目
+    public class ModelWalker
+    {
+        public ModelWalker( FooViewModel vroot, Window owner )
+        {
+        }
+
+        public delegate void EnterDirEventHandler( object serder, EventArgs e );
+        public delegate void LeaveDirEventHandler( object serder, EventArgs e );
+        public delegate void PassFileEventHandler( object serder, EventArgs e );
+
+        public event EnterDirEventHandler EnterDir;
+        public event LeaveDirEventHandler LeaveDir;
+        public event PassFileEventHandler PassFile;
+
+        public bool walk()
+        {
+            if ( EnterDir != null ) {
+                EnterDir( this, new EventArgs() );
+            }
+            if ( LeaveDir != null ) {
+                LeaveDir( this, new EventArgs() );
+            }
+            if ( PassFile != null ) {
+                PassFile( this, new EventArgs() );
+            }
+            return true;
         }
     }
 
