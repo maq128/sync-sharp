@@ -337,44 +337,12 @@ namespace Sync
 
         private void doCopy( FooViewModel model, ISimpleFS to )
         {
-            //ModelWalker walker = new ModelWalker( model, this );
-            //walker.walk();
-            //return;
-
-            // 收集出所有待复制的文件
-            List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
-            if ( colls == null )
-                return;
-
-            // 逐个复制文件
-            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
-                BackgroundWorker _worker = (BackgroundWorker)worker;
-                foreach ( SimpleFileInfo source in colls ) {
-                    if ( _worker.CancellationPending )
-                        break;
-                    _worker.ReportProgress( 0 );
-
-                    bool ok = to.copyFileIn( source );
-                    if ( !ok ) {
-                        // FIXME: 这里辅助线程不能正确显示 UI 对话框
-                        MessageBoxResult res = MessageBox.Show(
-                            this,
-                            "无法复制以下文件：\r\n  " + source.FullName + "\r\n\r\n要继续复制其余的文件吗？\r\n点击“取消”将停止复制。",
-                            "操作失败",
-                            MessageBoxButton.OKCancel,
-                            MessageBoxImage.Error
-                        );
-                        if ( res != MessageBoxResult.OK )
-                            break;
-                    }
-                }
-                ev.Cancel = _worker.CancellationPending;
+            ModelWalker walker = new ModelWalker();
+            walker.PassFile += ( SimpleFileInfo file ) => {
+                // 这段代码将在辅助线程中执行
+                bool ok = to.copyFileIn( file );
             };
-
-            ProcessDlg dlg = new ProcessDlg( fnWorking, this );
-            bool? finished = dlg.ShowDialog();
-            if ( finished.HasValue && (bool)finished ) {
-            }
+            walker.walk( model, this );
         }
 
         private void doRCopy( FooViewModel model, ISimpleFS from )
@@ -420,6 +388,19 @@ namespace Sync
 
         private void doDelete( FooViewModel model )
         {
+            ModelWalker walker = new ModelWalker();
+            walker.EnterDir += ( SimpleDirInfo dir ) => {
+                Console.WriteLine( "doDelete - EnterDir: " + dir.FullName );
+            };
+            walker.LeaveDir += ( SimpleDirInfo dir ) => {
+                Console.WriteLine( "doDelete - LeaveDir: " + dir.FullName );
+            };
+            walker.PassFile += ( SimpleFileInfo file ) => {
+                Console.WriteLine( "doDelete - PassFile: " + file.FullName );
+            };
+            walker.walk( model, this );
+            return;
+
             List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
             if ( colls == null )
                 return;
@@ -497,30 +478,114 @@ namespace Sync
     // 遍历一个 model 中选中的项目
     public class ModelWalker
     {
-        public ModelWalker( FooViewModel vroot, Window owner )
+        BackgroundWorker _worker;
+
+        public ModelWalker()
         {
         }
 
-        public delegate void EnterDirEventHandler( object serder, EventArgs e );
-        public delegate void LeaveDirEventHandler( object serder, EventArgs e );
-        public delegate void PassFileEventHandler( object serder, EventArgs e );
+        public delegate void EnterDirEventHandler( SimpleDirInfo dir );
+        public delegate void LeaveDirEventHandler( SimpleDirInfo dir );
+        public delegate void PassFileEventHandler( SimpleFileInfo file );
 
         public event EnterDirEventHandler EnterDir;
         public event LeaveDirEventHandler LeaveDir;
         public event PassFileEventHandler PassFile;
 
-        public bool walk()
+        public void walk( FooViewModel model, Window owner )
         {
+            DoWorkEventHandler fnWorking = delegate( object obj, DoWorkEventArgs ev ) {
+                _worker = (BackgroundWorker)obj;
+                try {
+                    walkModel( model );
+                } catch ( Exception ex ) {
+                    // 如果不是因为主动要求中止，则向外抛错
+                    if ( !_worker.CancellationPending ) {
+                        throw ex;
+                    }
+                }
+                ev.Cancel = _worker.CancellationPending;
+            };
+
+            ProcessDlg dlg = new ProcessDlg( fnWorking, owner );
+            dlg.ShowDialog();
+        }
+
+        public void walkModel( FooViewModel model )
+        {
+            if ( model.IsChecked.HasValue && !(bool)model.IsChecked )
+                return;
+
+            if ( _worker.CancellationPending ) {
+                throw new Exception( "取消了操作" );
+            }
+            _worker.ReportProgress( 0 );
+
+            if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_VIRTUALROOT ) {
+                foreach ( FooViewModel sub in model.Children ) {
+                    walkModel( sub );
+                }
+            } else if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FOLDER ) {
+                if ( model.Fullpath.Length > 0 ) {
+                    // 尚未展开的子目录，用 FS 继续递归遍历
+                    walkFs( (SimpleDirInfo)model.Fso );
+                } else {
+                    // 已经展开的子目录
+                    if ( EnterDir != null ) {
+                        EnterDir( (SimpleDirInfo)model.Fso );
+                    }
+
+                    foreach ( FooViewModel sub in model.Children ) {
+                        walkModel( sub );
+                    }
+
+                    if ( LeaveDir != null ) {
+                        LeaveDir( (SimpleDirInfo)model.Fso );
+                    }
+                }
+            } else if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FILE ) {
+                // 文件
+                if ( PassFile != null ) {
+                    PassFile( (SimpleFileInfo)model.Fso );
+                }
+            }
+        }
+
+        public void walkFs( SimpleDirInfo dir )
+        {
+            if ( _worker.CancellationPending ) {
+                throw new Exception( "取消了操作" );
+            }
+            _worker.ReportProgress( 0 );
+
             if ( EnterDir != null ) {
-                EnterDir( this, new EventArgs() );
+                EnterDir( dir );
             }
+
+            foreach ( KeyValuePair<string, SimpleInfoBase> item in dir.getChildren() ) {
+                string name = item.Key;
+                SimpleInfoBase value = item.Value;
+                if ( value.GetType() == typeof( SimpleDirInfo ) ) {
+                    // 子目录
+                    SimpleDirInfo subDir = (SimpleDirInfo)value;
+                    walkFs( subDir );
+                } else if ( value.GetType() == typeof( SimpleFileInfo ) ) {
+                    // 文件
+                    if ( _worker.CancellationPending ) {
+                        throw new Exception( "取消了操作" );
+                    }
+                    _worker.ReportProgress( 0 );
+
+                    if ( PassFile != null ) {
+                        SimpleFileInfo file = (SimpleFileInfo)value;
+                        PassFile( file );
+                    }
+                }
+            }
+
             if ( LeaveDir != null ) {
-                LeaveDir( this, new EventArgs() );
+                LeaveDir( dir );
             }
-            if ( PassFile != null ) {
-                PassFile( this, new EventArgs() );
-            }
-            return true;
         }
     }
 

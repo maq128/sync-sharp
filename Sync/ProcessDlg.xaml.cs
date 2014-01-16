@@ -47,6 +47,8 @@ namespace Sync
                 if ( e.ProgressPercentage > 0 ) {
                     value = (int)( progressBar1.Minimum + ( progressBar1.Maximum - progressBar1.Minimum ) * e.ProgressPercentage / 100 );
                 }
+                if ( value > progressBar1.Maximum )
+                    value = (int)progressBar1.Minimum;
                 progressBar1.Value = value;
                 per = (int)progressBar1.Value;
 
