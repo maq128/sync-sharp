@@ -83,6 +83,9 @@ namespace Sync
             this.LastWriteTime = other.LastWriteTime;
             this.Length = other.Length;
         }
+
+        // 多数情况下为空。仅用于“反向复制”时记录对方文件属性（主要是 LastWriteTime）
+        public SimpleFileInfo opposite;
     }
 
     /* 简单的文件系统访问接口。
@@ -117,10 +120,15 @@ namespace Sync
         bool copyFileIn( SimpleFileInfo source );
 
         /// <summary>
-        /// 删除指定的文件或者目录。
-        /// 如果指定的是目录，则只有在该目录为空的时候才会删除。
+        /// 删除指定的文件。
         /// </summary>
-        /// <param name="path">指定的文件或者目录。</param>
-        bool del( string path );
+        /// <param name="path">指定的文件。</param>
+        bool delFile( string path );
+
+        /// <summary>
+        /// 删除指定的目录。只有在该目录为空的时候才会删除。
+        /// </summary>
+        /// <param name="path">指定的目录。</param>
+        bool delDir( string path );
     }
 }

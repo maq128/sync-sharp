@@ -193,7 +193,7 @@ namespace Sync
             if ( _worker.CancellationPending ) {
                 throw new Exception( "取消了操作" );
             }
-            _worker.ReportProgress( 0, String.Format("扫描文件夹: {0}", ++this._scanCount) );
+            ProcessDlg.reportMain( 0, String.Format("扫描文件夹: {0}", ++this._scanCount) );
 
             // 读取 A、B 的所有子项
             SortedList<string, SimpleInfoBase> aChildren = dirA.getChildren();
@@ -310,6 +310,9 @@ namespace Sync
                 SimpleFileInfo a = item.Value[0];
                 SimpleFileInfo b = item.Value[1];
 
+                a.opposite = b;
+                b.opposite = a;
+
                 if ( a.LastWriteTime > b.LastWriteTime.AddSeconds( 5 ) ) {
                     // A > B
                     parentAnewer.Children.Add( parentAnewer.CreateFileItem( a ) );
@@ -340,6 +343,7 @@ namespace Sync
             ModelWalker walker = new ModelWalker();
             walker.PassFile += ( SimpleFileInfo file ) => {
                 // 这段代码将在辅助线程中执行
+                ProcessDlg.reportMain( 0, "复制: " + file.FullName );
                 bool ok = to.copyFileIn( file );
             };
             walker.walk( model, this );
@@ -347,83 +351,29 @@ namespace Sync
 
         private void doRCopy( FooViewModel model, ISimpleFS from )
         {
-            // 收集出所有待复制的文件
-            List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
-            if ( colls == null )
-                return;
-
-            // 逐个复制文件
-            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
-                BackgroundWorker _worker = (BackgroundWorker)worker;
-                foreach ( SimpleFileInfo dest in colls ) {
-                    if ( _worker.CancellationPending )
-                        break;
-                    _worker.ReportProgress( 0 );
-
-                    // FIXME: 这里的 SimpleFileInfo 对象属性应该是“源文件”的才对（主要是最后修改时间）
-                    SimpleFileInfo source = new SimpleFileInfo( dest );
-                    source.rootFS = from;
-                    bool ok = dest.rootFS.copyFileIn( source );
-                    if ( !ok ) {
-                        // FIXME: 这里辅助线程不能正确显示 UI 对话框
-                        MessageBoxResult res = MessageBox.Show(
-                            this,
-                            "无法复制以下文件：\r\n  " + source.FullName + "\r\n\r\n要继续复制其余的文件吗？\r\n点击“取消”将停止复制。",
-                            "操作失败",
-                            MessageBoxButton.OKCancel,
-                            MessageBoxImage.Error
-                        );
-                        if ( res != MessageBoxResult.OK )
-                            break;
-                    }
-                }
-                ev.Cancel = _worker.CancellationPending;
+            ModelWalker walker = new ModelWalker();
+            walker.PassFile += ( SimpleFileInfo file ) => {
+                // 这段代码将在辅助线程中执行
+                ProcessDlg.reportMain( 0, "反向复制: " + file.FullName );
+                bool ok = file.rootFS.copyFileIn( file.opposite );
             };
-
-            ProcessDlg dlg = new ProcessDlg( fnWorking, this );
-            bool? finished = dlg.ShowDialog();
-            if ( finished.HasValue && (bool)finished ) {
-            }
+            walker.walk( model, this );
         }
 
         private void doDelete( FooViewModel model )
         {
             ModelWalker walker = new ModelWalker();
-            walker.EnterDir += ( SimpleDirInfo dir ) => {
-                Console.WriteLine( "doDelete - EnterDir: " + dir.FullName );
+            walker.PassFile += ( SimpleFileInfo file ) => {
+                // 这段代码将在辅助线程中执行
+                ProcessDlg.reportMain( 0, "删除: " + file.FullName );
+                bool ok = file.rootFS.delFile( file.FullName );
             };
             walker.LeaveDir += ( SimpleDirInfo dir ) => {
-                Console.WriteLine( "doDelete - LeaveDir: " + dir.FullName );
-            };
-            walker.PassFile += ( SimpleFileInfo file ) => {
-                Console.WriteLine( "doDelete - PassFile: " + file.FullName );
+                // 这段代码将在辅助线程中执行
+                ProcessDlg.reportMain( 0, "删除: " + dir.FullName );
+                bool ok = dir.rootFS.delDir( dir.FullName );
             };
             walker.walk( model, this );
-            return;
-
-            List<SimpleFileInfo> colls = TreeWalker.walk( model, this );
-            if ( colls == null )
-                return;
-
-            // TODO: 删除空文件夹
-
-            // 逐个删除文件
-            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
-                BackgroundWorker _worker = (BackgroundWorker)worker;
-                foreach ( SimpleFileInfo source in colls ) {
-                    if ( _worker.CancellationPending )
-                        break;
-                    _worker.ReportProgress( 0 );
-
-                    source.rootFS.del( source.FullName );
-                }
-                ev.Cancel = _worker.CancellationPending;
-            };
-
-            ProcessDlg dlg = new ProcessDlg( fnWorking, this );
-            bool? finished = dlg.ShowDialog();
-            if ( finished.HasValue && (bool)finished ) {
-            }
         }
 
         private void btnCopy_a_Click( object sender, RoutedEventArgs e )
@@ -585,91 +535,6 @@ namespace Sync
 
             if ( LeaveDir != null ) {
                 LeaveDir( dir );
-            }
-        }
-    }
-
-    // 遍历一个 model 以收集其全部选中的项目（只有文件，不包含目录）
-    public class TreeWalker
-    {
-        static public List<SimpleFileInfo> walk( FooViewModel vroot, Window owner )
-        {
-            TreeWalker walker = new TreeWalker();
-            walker._colls = new List<SimpleFileInfo>();
-            DoWorkEventHandler fnWorking = delegate( object worker, DoWorkEventArgs ev ) {
-                walker._worker = (BackgroundWorker)worker;
-                try {
-                    foreach ( FooViewModel sub in vroot.Children ) {
-                        walker.walkModelRecur( sub, "/" );
-                    }
-                } catch ( Exception ex ) {
-                    // 如果不是因为主动要求中止，则向外抛错
-                    if ( !walker._worker.CancellationPending ) {
-                        throw ex;
-                    }
-                }
-                ev.Cancel = walker._worker.CancellationPending;
-            };
-
-            ProcessDlg dlg = new ProcessDlg( fnWorking, owner );
-            bool? finished = dlg.ShowDialog();
-            if ( finished.HasValue && (bool)finished ) {
-                return walker._colls;
-            }
-
-            return null;
-        }
-
-        BackgroundWorker _worker;
-        List<SimpleFileInfo> _colls;
-
-        private TreeWalker()
-        {
-            _colls = new List<SimpleFileInfo>();
-        }
-
-        private void walkModelRecur( FooViewModel model, string path )
-        {
-            if ( _worker.CancellationPending ) {
-                return;
-            }
-            _worker.ReportProgress( 0 );
-
-            if ( model.IsChecked.HasValue && !(bool)model.IsChecked )
-                return;
-            if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FOLDER ) {
-                if ( model.Fullpath.Length > 0 ) {
-                    // 尚未展开的子目录，用 FS 继续递归遍历
-                    walkFsRecur( path + model.Name + "/", model.Fso.rootFS );
-                } else {
-                    // 已经展开的子目录
-                    foreach ( FooViewModel sub in model.Children ) {
-                        walkModelRecur( sub, path + model.Name + "/" );
-                    }
-                }
-            } else if ( model.Type == FooViewModel.ItemType.ITEM_TYPE_FILE ) {
-                // 文件
-                _colls.Add( (SimpleFileInfo)model.Fso );
-            }
-        }
-
-        private void walkFsRecur( string path, ISimpleFS fs )
-        {
-            if ( _worker.CancellationPending ) {
-                throw new Exception( "取消了操作" );
-            }
-            _worker.ReportProgress( 0 );
-
-            foreach ( KeyValuePair<string, SimpleInfoBase> item in fs.getChildren( path ) ) {
-                string name = item.Key;
-                SimpleInfoBase value = item.Value;
-                if ( value.GetType() == typeof( SimpleDirInfo ) ) {
-                    // 子目录
-                    walkFsRecur( path + name + "/", fs );
-                } else {
-                    // 文件
-                    _colls.Add( (SimpleFileInfo)value );
-                }
             }
         }
     }

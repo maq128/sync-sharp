@@ -193,6 +193,9 @@ namespace Sync
                 int contentLength = int.Parse( response.GetResponseHeader( "Content-Length" ) );
                 int doneLength = 0;
 
+                ProcessDlg.reportMain( 0, String.Format( "下载: {0}\r\n字节: {1:N0}", downloadUri.AbsoluteUri, contentLength ) );
+                if ( contentLength <= 0 )
+                    contentLength = 1;
                 using ( Stream stream = response.GetResponseStream() ) {
                     using ( FileStream fs = new FileStream( localFilePath, FileMode.Create, FileAccess.Write ) ) {
                         byte[] content = new byte[4096];
@@ -200,7 +203,7 @@ namespace Sync
                         do {
                             bytesRead = stream.Read( content, 0, content.Length );
                             doneLength += bytesRead;
-                            ProcessDlg._worker.ReportProgress( (int)doneLength * 100 / contentLength, String.Format( "[{0:N0}] {1}", contentLength, remoteFilePath ) );
+                            ProcessDlg.reportFile( (int)doneLength * 100 / contentLength );
 
                             fs.Write( content, 0, bytesRead );
                         } while ( bytesRead > 0 );
@@ -239,10 +242,19 @@ namespace Sync
             }
         }
 
-        public void Delete( String remoteFilePath )
+        public void DeleteFile( String remoteFilePath )
         {
             remoteFilePath = remoteFilePath.Trim( '/' );
             Uri deleteUri = new Uri( this.server + remoteFilePath );
+
+            using ( WebResponse response = HTTPRequest( deleteUri, "DELETE", null, null, null ) ) {
+            }
+        }
+
+        public void DeleteDir( String remoteDirPath )
+        {
+            remoteDirPath = remoteDirPath.Trim( '/' );
+            Uri deleteUri = new Uri( this.server + remoteDirPath + '/' );
 
             using ( WebResponse response = HTTPRequest( deleteUri, "DELETE", null, null, null ) ) {
             }
@@ -307,16 +319,6 @@ namespace Sync
             _auth._pass = Pass;
             _auth.injectRequest( httpWebRequest );
 
-            //if ( user != null && pass != null ) {
-            //    if ( domain != null ) {
-            //        httpWebRequest.Credentials = new NetworkCredential( user, pass, domain );
-            //    } else {
-            //        httpWebRequest.Credentials = new NetworkCredential( user, pass );
-            //    }
-            //}
-            //httpWebRequest.AuthenticationLevel = System.Net.Security.AuthenticationLevel.MutualAuthRequested;
-            //httpWebRequest.PreAuthenticate = true;
-
             if ( headers != null ) {
                 foreach ( string key in headers.Keys ) {
                     httpWebRequest.Headers.Set( key, headers[key] );
@@ -340,13 +342,18 @@ namespace Sync
                     httpWebRequest.Timeout = 500000;
 
                     using ( Stream s = httpWebRequest.GetRequestStream() ) {
+                        FileInfo fi = new FileInfo( uploadFilePath );
                         using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
+                            ProcessDlg.reportMain( 0, String.Format( "上传: {0}\r\n字节: {1:N0}", fi.FullName, fi.Length ) );
+                            long lenSent = 0;
                             byte[] buf = new byte[4096];
-                            int bytesRead = 0;
-                            do {
-                                bytesRead = fs.Read( buf, 0, buf.Length );
+                            int bytesRead = fs.Read( buf, 0, buf.Length );
+                            while ( bytesRead > 0 ) {
+                                lenSent += bytesRead;
+                                ProcessDlg.reportFile( (int)( lenSent * 100 / fi.Length ) );
                                 s.Write( buf, 0, bytesRead );
-                            } while ( bytesRead > 0 );
+                                bytesRead = fs.Read( buf, 0, buf.Length );
+                            }
                         }
                     }
                 }
@@ -360,50 +367,8 @@ namespace Sync
                 if ( ex.Response == null || ( (HttpWebResponse)ex.Response ).StatusCode != HttpStatusCode.Unauthorized )
                     throw;
 
-                if ( User == null || Pass == null )
-                    throw new UnauthorizedException();
-
                 _auth.injectResponse( ex.Response );
-
-                httpWebRequest = (HttpWebRequest)HttpWebRequest.Create( uri );
-                httpWebRequest.Method = requestMethod;
-
-                _auth.injectRequest( httpWebRequest );
-
-                if ( headers != null ) {
-                    foreach ( string key in headers.Keys ) {
-                        httpWebRequest.Headers.Set( key, headers[key] );
-                    }
-                }
-
-                if ( content != null || uploadFilePath != null ) {
-                    if ( content != null ) {
-                        // The request either contains actual content...
-                        httpWebRequest.ContentLength = content.Length;
-                        httpWebRequest.ContentType = "text/xml";
-                        Stream s = httpWebRequest.GetRequestStream();
-                        s.Write( content, 0, content.Length );
-                    } else {
-                        // ...or a reference to the file to be added as content.
-                        httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
-                        using ( Stream s = httpWebRequest.GetRequestStream() ) {
-                            using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
-                                byte[] buf = new byte[4096];
-                                int bytesRead = 0;
-                                do {
-                                    bytesRead = fs.Read( buf, 0, buf.Length );
-                                    s.Write( buf, 0, bytesRead );
-                                } while ( bytesRead > 0 );
-                            }
-                        }
-                    }
-                }
-
-                try {
-                    response = (HttpWebResponse)httpWebRequest.GetResponse();
-                } catch ( WebException ) {
-                    throw new UnauthorizedException();
-                }
+                throw new UnauthorizedException();
             }
 
             _auth.injectResponse( response );

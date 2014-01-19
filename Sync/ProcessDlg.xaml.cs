@@ -23,7 +23,19 @@ namespace Sync
     /// </summary>
     public partial class ProcessDlg : Window
     {
-        static public BackgroundWorker _worker;
+        // 这两个接口函数只能在 _worker 的辅助线程中调用
+        static public void reportMain( int percentProgress, object userState )
+        {
+            if ( _worker != null )
+                _worker.ReportProgress( percentProgress, userState );
+        }
+        static public void reportFile( int percentProgress )
+        {
+            if ( _worker != null )
+                _worker.ReportProgress( percentProgress );
+        }
+
+        static private BackgroundWorker _worker;
         bool _isShown;
 
         public ProcessDlg( DoWorkEventHandler fnWorking, Window owner )
@@ -40,22 +52,26 @@ namespace Sync
             _worker.DoWork += fnWorking;
 
             // lambda 语法
-            int per = (int)progressBar1.Minimum;
+            int per = (int)progressBarMain.Minimum;
             _worker.ProgressChanged += ( sender, e ) => {
                 // 这段代码将在主线程中执行
-                int value = per + 1;
-                if ( e.ProgressPercentage > 0 ) {
-                    value = (int)( progressBar1.Minimum + ( progressBar1.Maximum - progressBar1.Minimum ) * e.ProgressPercentage / 100 );
-                }
-                if ( value > progressBar1.Maximum )
-                    value = (int)progressBar1.Minimum;
-                progressBar1.Value = value;
-                per = (int)progressBar1.Value;
 
                 if ( e.UserState != null ) {
-                    this.Title = e.UserState.ToString();
+                    // 此事件来自于 reportMain()
+                    int value = per + 1;
+                    if ( e.ProgressPercentage > 0 ) {
+                        value = (int)( progressBarMain.Minimum + ( progressBarMain.Maximum - progressBarMain.Minimum ) * e.ProgressPercentage / 100 );
+                    }
+                    if ( value > progressBarMain.Maximum )
+                        value = (int)progressBarMain.Minimum;
+                    progressBarMain.Value = value;
+                    per = (int)progressBarMain.Value;
+                    this.info.Text = e.UserState.ToString();
+                    this.progressBarFile.Visibility = Visibility.Hidden;
                 } else {
-                    this.Title = "正在处理……";
+                    // 此事件来自于 reportFile()
+                    progressBarFile.Value = (int)( progressBarFile.Minimum + ( progressBarFile.Maximum - progressBarFile.Minimum ) * e.ProgressPercentage / 100 );
+                    progressBarFile.Visibility = Visibility.Visible;
                 }
             };
 
@@ -98,6 +114,7 @@ namespace Sync
             this._isShown = false;
             // 请求中止 worker
             _worker.CancelAsync();
+            _worker = null;
         }
     }
 }

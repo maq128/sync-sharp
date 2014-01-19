@@ -59,17 +59,6 @@ namespace Sync
                 }
             }
 
-            //Console.WriteLine( "[" + path + "]" );
-            //foreach ( KeyValuePair<string, SimpleInfoBase> item in result ) {
-            //    string name = item.Key;
-            //    SimpleInfoBase value = item.Value;
-            //    if ( value.GetType() == typeof( SimpleDirInfo ) ) {
-            //        Console.WriteLine( "  folder: " + value.Name );
-            //    } else {
-            //        Console.WriteLine( "  file  : " + value.Name );
-            //    }
-            //}
-
             return result;
         }
 
@@ -134,11 +123,23 @@ namespace Sync
             }
         }
 
-        public bool del( string path )
+        public bool delFile( string path )
         {
             try {
-                Console.WriteLine( "delete: " + this._root + path );
-                this._client.Delete( path );
+                this._client.DeleteFile( path );
+            } catch ( Exception ) {
+                return false;
+            }
+            return true;
+        }
+
+        public bool delDir( string path )
+        {
+            try {
+                SortedList<string, SimpleInfoBase> children = this.getChildren( path );
+                if ( children.Count > 0 )
+                    return false;
+                this._client.DeleteDir( path );
             } catch ( Exception ) {
                 return false;
             }

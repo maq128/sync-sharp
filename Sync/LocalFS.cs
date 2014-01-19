@@ -68,11 +68,20 @@ namespace Sync
             return true;
         }
 
-        public bool del( string path )
+        public bool delFile( string path )
         {
             try {
-                Console.WriteLine( "delete: " + this._root + path );
                 File.Delete( this._root + path );
+            } catch ( Exception ) {
+                return false;
+            }
+            return true;
+        }
+
+        public bool delDir( string path )
+        {
+            try {
+                Directory.Delete( this._root + path );
             } catch ( Exception ) {
                 return false;
             }
