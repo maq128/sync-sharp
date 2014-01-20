@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Xml;
+using System.Threading;
 
 namespace Sync
 {
@@ -141,7 +142,7 @@ namespace Sync
             </D:response>
 */
             List<Res> list = new List<Res>();
-            using ( WebResponse response = HTTPRequest( listUri, "PROPFIND", headers, Encoding.UTF8.GetBytes( propfind.ToString() ), null ) ) {
+            using ( WebResponse response = HTTPRequest( listUri, "PROPFIND", headers, Encoding.UTF8.GetBytes( propfind.ToString() ), null, null ) ) {
                 using ( Stream stream = response.GetResponseStream() ) {
                     XmlDocument xml = new XmlDocument();
                     xml.Load( stream );
@@ -188,28 +189,7 @@ namespace Sync
             Uri downloadUri = new Uri( this.server + remoteFilePath );
             string method = WebRequestMethods.Http.Get.ToString();
 
-            using ( HttpWebResponse response = (HttpWebResponse)HTTPRequest( downloadUri, method, null, null, null ) ) {
-                int statusCode = (int)response.StatusCode;
-                int contentLength = int.Parse( response.GetResponseHeader( "Content-Length" ) );
-                int doneLength = 0;
-
-                ProcessDlg.reportMain( 0, String.Format( "下载: {0}\r\n字节: {1:N0}", downloadUri.AbsoluteUri, contentLength ) );
-                if ( contentLength <= 0 )
-                    contentLength = 1;
-                using ( Stream stream = response.GetResponseStream() ) {
-                    using ( FileStream fs = new FileStream( localFilePath, FileMode.Create, FileAccess.Write ) ) {
-                        byte[] content = new byte[4096];
-                        int bytesRead = 0;
-                        do {
-                            bytesRead = stream.Read( content, 0, content.Length );
-                            doneLength += bytesRead;
-                            ProcessDlg.reportFile( (int)doneLength * 100 / contentLength );
-
-                            fs.Write( content, 0, bytesRead );
-                        } while ( bytesRead > 0 );
-                    }
-                }
-            }
+            HTTPRequest( downloadUri, method, null, null, null, localFilePath );
         }
 
         public void Upload( String remoteFilePath, String localFilePath )
@@ -218,7 +198,7 @@ namespace Sync
             Uri uploadUri = new Uri( this.server + remoteFilePath );
             string method = WebRequestMethods.Http.Put.ToString();
 
-            using ( HttpWebResponse response = (HttpWebResponse)HTTPRequest( uploadUri, method, null, null, localFilePath ) ) {
+            using ( HttpWebResponse response = (HttpWebResponse)HTTPRequest( uploadUri, method, null, null, localFilePath, null ) ) {
                 int statusCode = (int)response.StatusCode;
             }
         }
@@ -238,7 +218,7 @@ namespace Sync
             proppatch.Append( "  </set>" );
             proppatch.Append( "</propertyupdate>" );
 
-            using ( WebResponse response = HTTPRequest( updateUri, "PROPPATCH", null, Encoding.UTF8.GetBytes( proppatch.ToString() ), null ) ) {
+            using ( WebResponse response = HTTPRequest( updateUri, "PROPPATCH", null, Encoding.UTF8.GetBytes( proppatch.ToString() ), null, null ) ) {
             }
         }
 
@@ -247,7 +227,7 @@ namespace Sync
             remoteFilePath = remoteFilePath.Trim( '/' );
             Uri deleteUri = new Uri( this.server + remoteFilePath );
 
-            using ( WebResponse response = HTTPRequest( deleteUri, "DELETE", null, null, null ) ) {
+            using ( WebResponse response = HTTPRequest( deleteUri, "DELETE", null, null, null, null ) ) {
             }
         }
 
@@ -256,7 +236,7 @@ namespace Sync
             remoteDirPath = remoteDirPath.Trim( '/' );
             Uri deleteUri = new Uri( this.server + remoteDirPath + '/' );
 
-            using ( WebResponse response = HTTPRequest( deleteUri, "DELETE", null, null, null ) ) {
+            using ( WebResponse response = HTTPRequest( deleteUri, "DELETE", null, null, null, null ) ) {
             }
         }
 
@@ -270,7 +250,7 @@ namespace Sync
             IDictionary<string, string> headers = new Dictionary<string, string>();
             headers.Add( "Destination", toUri.AbsoluteUri );
 
-            using ( WebResponse response = HTTPRequest( fromUri, "MOVE", headers, null, null ) ) {
+            using ( WebResponse response = HTTPRequest( fromUri, "MOVE", headers, null, null, null ) ) {
             }
         }
 
@@ -282,7 +262,7 @@ namespace Sync
 
             string method = WebRequestMethods.Http.MkCol.ToString();
 
-            using ( WebResponse response = HTTPRequest( createUri, method, null, null, null ) ) {
+            using ( WebResponse response = HTTPRequest( createUri, method, null, null, null, null ) ) {
             }
         }
         #endregion
@@ -299,9 +279,8 @@ namespace Sync
         /// <param name="headers"></param>
         /// <param name="content"></param>
         /// <param name="uploadFilePath"></param>
-        /// <param name="callback"></param>
-        /// <param name="state"></param>
-        WebResponse HTTPRequest( Uri uri, string requestMethod, IDictionary<string, string> headers, byte[] content, string uploadFilePath )
+        /// <param name="downloadFilePath"></param>
+        WebResponse HTTPRequest( Uri uri, string requestMethod, IDictionary<string, string> headers, byte[] content, string uploadFilePath, string downloadFilePath )
         {
             HttpWebRequest httpWebRequest = (HttpWebRequest)HttpWebRequest.Create( uri );
             httpWebRequest.Method = requestMethod;
@@ -327,52 +306,108 @@ namespace Sync
 
             if ( content != null || uploadFilePath != null ) {
                 if ( content != null ) {
-                    // The request either contains actual content...
+                    // 普通内容以同步方式提交
                     httpWebRequest.ContentLength = content.Length;
                     httpWebRequest.ContentType = "text/xml";
                     using ( Stream s = httpWebRequest.GetRequestStream() ) {
                         s.Write( content, 0, content.Length );
                     }
                 } else {
-                    // ...or a reference to the file to be added as content.
+                    // 上传文件以异步方式提交（避免受 httpWebRequest.Timeout 缺省 100 秒的限制）
                     httpWebRequest.SendChunked = true;
                     //httpWebRequest.ContentLength = new FileInfo( uploadFilePath ).Length;
 
-                    // FIXME: 此处应该改为异步方式，就可以不受超时的限制了
-                    httpWebRequest.Timeout = 500000;
-
-                    using ( Stream s = httpWebRequest.GetRequestStream() ) {
-                        FileInfo fi = new FileInfo( uploadFilePath );
-                        using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
-                            ProcessDlg.reportMain( 0, String.Format( "上传: {0}\r\n字节: {1:N0}", fi.FullName, fi.Length ) );
-                            long lenSent = 0;
-                            byte[] buf = new byte[4096];
-                            int bytesRead = fs.Read( buf, 0, buf.Length );
-                            while ( bytesRead > 0 ) {
-                                lenSent += bytesRead;
-                                ProcessDlg.reportFile( (int)( lenSent * 100 / fi.Length ) );
-                                s.Write( buf, 0, bytesRead );
-                                bytesRead = fs.Read( buf, 0, buf.Length );
+                    ManualResetEvent reqDone = new ManualResetEvent( false );
+                    Exception reqEx = null;
+                    httpWebRequest.BeginGetRequestStream( ( IAsyncResult ar ) => {
+                        try {
+                            using ( Stream postStream = httpWebRequest.EndGetRequestStream( ar ) ) {
+                                FileInfo fi = new FileInfo( uploadFilePath );
+                                using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
+                                    ProcessDlg.reportMain( 0, String.Format( "上传: {0}\r\n字节: {1:N0}", fi.FullName, fi.Length ) );
+                                    long lenSent = 0;
+                                    byte[] buf = new byte[4096];
+                                    int bytesRead = fs.Read( buf, 0, buf.Length );
+                                    while ( bytesRead > 0 ) {
+                                        lenSent += bytesRead;
+                                        ProcessDlg.reportFile( (int)( lenSent * 100 / fi.Length ) );
+                                        postStream.Write( buf, 0, bytesRead );
+                                        bytesRead = fs.Read( buf, 0, buf.Length );
+                                    }
+                                }
                             }
+                        } catch ( Exception e ) {
+                            reqEx = e;
                         }
-                    }
+                        reqDone.Set();
+                    }, null );
+                    reqDone.WaitOne();
+
+                    // 如果发生异常，则向外抛
+                    if ( reqEx != null )
+                        throw reqEx;
                 }
             }
 
-            HttpWebResponse response;
-            try {
-                response = (HttpWebResponse)httpWebRequest.GetResponse();
-            } catch ( WebException ex ) {
-                // Try to fix a 401 exception by adding a Authorization header
-                if ( ex.Response == null || ( (HttpWebResponse)ex.Response ).StatusCode != HttpStatusCode.Unauthorized )
-                    throw;
+            // 普通内容采用同步方式接收，返回 response 由调用者处理
+            if ( downloadFilePath == null ) {
+                HttpWebResponse response;
+                try {
+                    response = (HttpWebResponse)httpWebRequest.GetResponse();
+                } catch ( WebException ex ) {
+                    // Try to fix a 401 exception by adding a Authorization header
+                    if ( ex.Response == null || ( (HttpWebResponse)ex.Response ).StatusCode != HttpStatusCode.Unauthorized )
+                        throw;
 
-                _auth.injectResponse( ex.Response );
-                throw new UnauthorizedException();
+                    _auth.injectResponse( ex.Response );
+                    throw new UnauthorizedException();
+                }
+
+                _auth.injectResponse( response );
+                return response;
             }
 
-            _auth.injectResponse( response );
-            return response;
+            // 下载文件采用异步方式接收（避免受 httpWebRequest.Timeout 缺省 100 秒的限制），直接保存为文件
+            ManualResetEvent respDone = new ManualResetEvent( false );
+            Exception respEx = null;
+            IAsyncResult result = (IAsyncResult)httpWebRequest.BeginGetResponse( ( IAsyncResult ar ) => {
+                try {
+                    using ( HttpWebResponse response = (HttpWebResponse)httpWebRequest.EndGetResponse( ar ) ) {
+                        _auth.injectResponse( response );
+
+                        int statusCode = (int)response.StatusCode;
+                        long contentLength = int.Parse( response.GetResponseHeader( "Content-Length" ) );
+                        long doneLength = 0;
+
+                        ProcessDlg.reportMain( 0, String.Format( "下载: {0}\r\n字节: {1:N0}", uri.AbsoluteUri, contentLength ) );
+                        if ( contentLength <= 0 )
+                            contentLength = 1;
+                        using ( Stream stream = response.GetResponseStream() ) {
+                            using ( FileStream fs = new FileStream( downloadFilePath, FileMode.Create, FileAccess.Write ) ) {
+                                byte[] buf = new byte[4096];
+                                int bytesRead = 0;
+                                do {
+                                    bytesRead = stream.Read( buf, 0, buf.Length );
+                                    doneLength += bytesRead;
+                                    ProcessDlg.reportFile( (int)( doneLength * 100 / contentLength ) );
+
+                                    fs.Write( buf, 0, bytesRead );
+                                } while ( bytesRead > 0 );
+                            }
+                        }
+                    }
+                } catch ( Exception e ) {
+                    respEx = e;
+                }
+                respDone.Set();
+            }, null );
+            respDone.WaitOne();
+
+            // 如果发生异常，则向外抛
+            if ( respEx != null )
+                throw respEx;
+
+            return null;
         }
         #endregion
     }
