@@ -107,12 +107,17 @@ namespace Sync
             return new LocalFS( name );
         }
 
-        private void connectModelToButtons( FooViewModel model, Button[] buttons )
+        private void connectTreeWithButtons( FolderTreeView tree, Button[] buttons )
         {
+            // 按钮和树的状态复位
+            tree.IsEnabled = true;
             foreach ( Button btn in buttons ) {
                 btn.IsEnabled = false;
             }
+            FooViewModel model = ( (List<FooViewModel>)tree.DataContext ).First<FooViewModel>();
+            model.IsExpanded = true;
 
+            // 树上有选择时，按钮状态联动
             model.PropertyChanged += ( object m, PropertyChangedEventArgs ev ) => {
                 if ( ev.PropertyName != "IsChecked" )
                     return;
@@ -121,6 +126,17 @@ namespace Sync
                     btn.IsEnabled = en;
                 }
             };
+
+            // 点击按钮时，禁用所有按钮和树
+            // FIXME: 多次执行时事件会叠加吗？
+            foreach ( Button btn in buttons ) {
+                btn.Click += ( object sender, RoutedEventArgs e ) => {
+                    tree.IsEnabled = false;
+                    foreach ( Button btn2 in buttons ) {
+                        btn2.IsEnabled = false;
+                    }
+                };
+            }
         }
 
         private void btnCompare_Click( object sender, RoutedEventArgs e )
@@ -144,12 +160,6 @@ namespace Sync
             FooViewModel rootAB = FooViewModel.CreateRootItem( "在AB中相同的文件", null );      // 不会存在 lazy-item，所以不需要 FS 支持
             FooViewModel rootBnewer = FooViewModel.CreateRootItem( "在B中较新的文件", null );   //
             FooViewModel rootBonly = FooViewModel.CreateRootItem( "仅在B中存在的文件", bFS );
-
-            // 根据节点的选择情况设置操作按钮的使能状态
-            connectModelToButtons( rootAonly, new Button[] { btnCopy_a, btnDelete_a } );
-            connectModelToButtons( rootAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
-            connectModelToButtons( rootBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
-            connectModelToButtons( rootBonly, new Button[] { btnCopy_b, btnDelete_b } );
 
             SimpleDirInfo dirA = new SimpleDirInfo( aFS );
             SimpleDirInfo dirB = new SimpleDirInfo( bFS );
@@ -178,13 +188,13 @@ namespace Sync
                 treeBnewer.DataContext = new List<FooViewModel> { rootBnewer };
                 treeBonly.DataContext = new List<FooViewModel> { rootBonly };
 
-                rootAonly.IsExpanded = true;
-                rootAnewer.IsExpanded = true;
-                rootAB.IsExpanded = true;
-                rootBnewer.IsExpanded = true;
-                rootBonly.IsExpanded = true;
-
                 tabControl1.SelectedIndex = 2;
+
+                // 建立树与按钮间的联动关系
+                connectTreeWithButtons( treeAonly, new Button[] { btnCopy_a, btnDelete_a } );
+                connectTreeWithButtons( treeAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
+                connectTreeWithButtons( treeBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
+                connectTreeWithButtons( treeBonly, new Button[] { btnCopy_b, btnDelete_b } );
             }
         }
 

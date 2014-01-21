@@ -8,7 +8,7 @@
     <Grid>
         <ProgressBar Height="10" Margin="12,12,12,0" Name="progressBarMain" VerticalAlignment="Top" Orientation="Horizontal" Value="0" />
         <ProgressBar Height="10" Margin="12,29,12,0" Name="progressBarFile" VerticalAlignment="Top" Orientation="Horizontal" Value="0" Visibility="Hidden" />
-        <TextBox Margin="12,45,12,0" Name="info" Height="51" VerticalAlignment="Top" BorderThickness="0" />
-        <Button Margin="202,0,209,8" Name="btn" Click="btn_Click" Height="27" VerticalAlignment="Bottom">停止</Button>
+        <TextBox Margin="12,45,12,0" Name="info" Height="51" VerticalAlignment="Top" BorderThickness="0" TextWrapping="Wrap" />
+        <Button Margin="191,0,0,8" Name="btn" Click="btn_Click" Height="27" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="69">停止</Button>
     </Grid>
 </Window>

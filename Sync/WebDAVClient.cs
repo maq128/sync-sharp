@@ -324,7 +324,7 @@ namespace Sync
                             using ( Stream postStream = httpWebRequest.EndGetRequestStream( ar ) ) {
                                 FileInfo fi = new FileInfo( uploadFilePath );
                                 using ( FileStream fs = new FileStream( uploadFilePath, FileMode.Open, FileAccess.Read ) ) {
-                                    ProcessDlg.reportMain( 0, String.Format( "上传: {0}\r\n字节: {1:N0}", fi.FullName, fi.Length ) );
+                                    ProcessDlg.reportMain( 0, String.Format( "上传: {0}\r\n字节: {1:N0}", uri.OriginalString, fi.Length ) );
                                     long lenSent = 0;
                                     byte[] buf = new byte[4096];
                                     int bytesRead = fs.Read( buf, 0, buf.Length );
@@ -379,7 +379,7 @@ namespace Sync
                         long contentLength = int.Parse( response.GetResponseHeader( "Content-Length" ) );
                         long doneLength = 0;
 
-                        ProcessDlg.reportMain( 0, String.Format( "下载: {0}\r\n字节: {1:N0}", uri.AbsoluteUri, contentLength ) );
+                        ProcessDlg.reportMain( 0, String.Format( "下载: {0}\r\n字节: {1:N0}", uri.OriginalString, contentLength ) );
                         if ( contentLength <= 0 )
                             contentLength = 1;
                         using ( Stream stream = response.GetResponseStream() ) {
