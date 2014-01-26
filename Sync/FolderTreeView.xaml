@@ -19,6 +19,7 @@
                 <Setter Property="KeyboardNavigation.AcceptsReturn" Value="True" />
                 <Setter Property="dw:VirtualToggleButton.IsVirtualToggleButton" Value="True" />
                 <Setter Property="dw:VirtualToggleButton.IsChecked" Value="{Binding IsChecked}" />
+                <EventSetter Event="TreeViewItem.MouseRightButtonDown" Handler="TreeViewItem_MouseRightButtonDown"/>
             </Style>
 
             <HierarchicalDataTemplate x:Key="CheckBoxItemTemplate" ItemsSource="{Binding Children, Mode=OneTime}">
@@ -54,7 +55,12 @@
         <TreeView
             ItemContainerStyle="{StaticResource TreeViewItemStyle}"
             ItemsSource="{Binding Mode=OneTime}"
-            ItemTemplate="{StaticResource CheckBoxItemTemplate}"
-        />
+            ItemTemplate="{StaticResource CheckBoxItemTemplate}" ContextMenuOpening="TreeView_ContextMenuOpening">
+            <TreeView.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="PlaceHolder" />
+                </ContextMenu>
+            </TreeView.ContextMenu>
+        </TreeView>
     </Grid>
 </UserControl>

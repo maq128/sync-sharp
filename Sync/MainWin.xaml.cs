@@ -50,6 +50,12 @@ namespace Sync
                 textDirA.Text = cp.a;
                 textDirB.Text = cp.b;
             }
+
+            // 点击按钮操作时，禁用所有按钮和树
+            connectButtonsToTree( new Button[] { btnCopy_a, btnDelete_a }, treeAonly );
+            connectButtonsToTree( new Button[] { btnCopy_an, btnRCopy_an }, treeAnewer );
+            connectButtonsToTree( new Button[] { btnCopy_bn, btnRCopy_bn }, treeBnewer );
+            connectButtonsToTree( new Button[] { btnCopy_b, btnDelete_b }, treeBonly );
         }
 
         Config _config;
@@ -107,15 +113,27 @@ namespace Sync
             return new LocalFS( name );
         }
 
-        private void connectTreeWithButtons( FolderTreeView tree, Button[] buttons )
+        private void connectButtonsToTree( Button[] buttons, FolderTreeView tree )
         {
-            // 按钮和树的状态复位
-            tree.IsEnabled = true;
+            foreach ( Button btn in buttons ) {
+                btn.Click += ( object sender, RoutedEventArgs e ) => {
+                    tree.IsEnabled = false;
+                    foreach ( Button btn2 in buttons ) {
+                        btn2.IsEnabled = false;
+                    }
+                };
+            }
+        }
+
+        private void connectTreeToButtons( FolderTreeView tree, Button[] buttons )
+        {
+            // 按钮和树的状态初始化
             foreach ( Button btn in buttons ) {
                 btn.IsEnabled = false;
             }
             FooViewModel model = ( (List<FooViewModel>)tree.DataContext ).First<FooViewModel>();
             model.IsExpanded = true;
+            tree.IsEnabled = model.Children.Count > 0;
 
             // 树上有选择时，按钮状态联动
             model.PropertyChanged += ( object m, PropertyChangedEventArgs ev ) => {
@@ -126,17 +144,6 @@ namespace Sync
                     btn.IsEnabled = en;
                 }
             };
-
-            // 点击按钮时，禁用所有按钮和树
-            // FIXME: 多次执行时事件会叠加吗？
-            foreach ( Button btn in buttons ) {
-                btn.Click += ( object sender, RoutedEventArgs e ) => {
-                    tree.IsEnabled = false;
-                    foreach ( Button btn2 in buttons ) {
-                        btn2.IsEnabled = false;
-                    }
-                };
-            }
         }
 
         private void btnCompare_Click( object sender, RoutedEventArgs e )
@@ -190,11 +197,12 @@ namespace Sync
 
                 tabControl1.SelectedIndex = 2;
 
-                // 建立树与按钮间的联动关系
-                connectTreeWithButtons( treeAonly, new Button[] { btnCopy_a, btnDelete_a } );
-                connectTreeWithButtons( treeAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
-                connectTreeWithButtons( treeBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
-                connectTreeWithButtons( treeBonly, new Button[] { btnCopy_b, btnDelete_b } );
+                // 在树上做选择时，设置按钮状态
+                connectTreeToButtons( treeAonly, new Button[] { btnCopy_a, btnDelete_a } );
+                connectTreeToButtons( treeAnewer, new Button[] { btnCopy_an, btnRCopy_an } );
+                connectTreeToButtons( treeAB, new Button[] {} );
+                connectTreeToButtons( treeBnewer, new Button[] { btnCopy_bn, btnRCopy_bn } );
+                connectTreeToButtons( treeBonly, new Button[] { btnCopy_b, btnDelete_b } );
             }
         }
 
